@@ -18,9 +18,9 @@ export const authenticate = async (
 ) => {
   try {
     const token = extractTokenFromHeader(req.headers.authorization) || req.cookies?.accessToken;
-    if (!token) {
-      throw AppError.unauthorized('Authentication required');
-    }
+    // if (!token) {
+    //   throw AppError.unauthorized('Authentication required');
+    // }
 
     const decoded = verifyAccessToken(token);
     const user = await User.findById(decoded.userId).select('id email role emailVerified');
