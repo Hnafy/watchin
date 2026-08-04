@@ -1,19 +1,21 @@
 import type { Request, Response } from 'express';
 import app from '../src/app.js';
-import { connectDB } from '../src/db.js';
+import { connectDB } from '../src/db/index.js';
 
 const HEALTH_PATHS = ['/', '/health', '/api/health'];
 
 let connectionPromise: Promise<void> | null = null;
 
 function ensureConnection(): Promise<void> {
-  if (!connectionPromise) {
-    connectionPromise = connectDB().catch((err: unknown) => {
-      connectionPromise = null;
-      throw err;
-    });
+  if (connectionPromise) {
+    return connectionPromise;
   }
-  return connectionPromise;
+  const promise = connectDB().catch((err: unknown) => {
+    connectionPromise = null;
+    throw err;
+  });
+  connectionPromise = promise;
+  return promise;
 }
 
 export default async function handler(req: Request, res: Response) {

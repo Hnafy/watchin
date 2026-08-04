@@ -10,7 +10,7 @@
     "render-build": "npm install && npm run build",
     "db:seed": "tsx src/seed.ts",
     "lint": "eslint src --ext .ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.api.json"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
