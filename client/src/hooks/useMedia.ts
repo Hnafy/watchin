@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { mediaApi, ratingApi, watchHistoryApi, watchlistApi, recommendationApi } from '../services/api';
+import { useAuthStore } from '../store/authStore';
 import { Media, PaginatedResponse, WatchHistoryItem, WatchlistItem, RatingStats } from '../types';
 
 export const useMediaList = (params: Record<string, unknown> = {}) =>
@@ -94,13 +95,15 @@ export const useWatchlist = (page = 1, limit = 50) =>
     staleTime: 60_000,
   });
 
-export const useWatchlistCheck = (mediaId: string) =>
-  useQuery({
+export const useWatchlistCheck = (mediaId: string) => {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  return useQuery({
     queryKey: ['watchlistCheck', mediaId],
     queryFn: () => watchlistApi.check(mediaId).then((r) => r.data.data.inWatchlist as boolean),
-    enabled: !!mediaId,
+    enabled: !!mediaId && isAuthenticated,
     staleTime: 120_000,
   });
+};
 
 export const useAddToWatchlist = () => {
   const qc = useQueryClient();

@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 export const API_URL = 'https://watchin-4crs.vercel.app/api';
+// export const API_URL = '/api';
 
 const api = axios.create({
   baseURL: API_URL,
