@@ -1,5 +1,5 @@
-import { User, Genre, Country, Language, Media, TrendingMedia, Person, CastMember } from './db/models';
-import { connectDB, disconnectDB } from './db';
+import { User, Genre, Country, Language, Media, TrendingMedia, Person, CastMember } from './db/models.js';
+import { connectDB, disconnectDB } from './db/index.js';
 
 async function main() {
   console.log('Seeding database...');

@@ -1,7 +1,7 @@
-import { config } from '../config';
-import { Media, Genre, Country, Language, Keyword, Person, CastMember, Director, Season } from '../db/models';
-import { slugify, ensureGenre, ensureCountry, ensureLanguage } from '../db/utils';
-import { AppError } from '../utils/AppError';
+import { config } from '../config/index.js';
+import { Media, Genre, Country, Language, Keyword, Person, CastMember, Director, Season } from '../db/models.js';
+import { slugify, ensureGenre, ensureCountry, ensureLanguage } from '../db/utils.js';
+import { AppError } from '../utils/AppError.js';
 
 const tmdbFetch = async (path: string, params: Record<string, string> = {}): Promise<any> => {
   const url = new URL(`${config.tmdb.baseUrl}${path}`);

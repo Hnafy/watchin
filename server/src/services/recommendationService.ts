@@ -1,4 +1,4 @@
-import { Media, CastMember, WatchHistory, WatchlistItem, Rating, TrendingMedia } from '../db/models';
+import { Media, CastMember, WatchHistory, WatchlistItem, Rating, TrendingMedia } from '../db/models.js';
 
 export const recommendationService = {
   async getSimilarMedia(mediaId: string) {

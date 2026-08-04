@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
-import { tmdbService } from '../services/tmdbService';
-import { AuthRequest } from '../middleware/authMiddleware';
+import { tmdbService } from '../services/tmdbService.js';
+import { AuthRequest } from '../middleware/authMiddleware.js';
 
 export const tmdbController = {
   async search(req: AuthRequest, res: Response, next: NextFunction) {

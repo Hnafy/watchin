@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { mediaController } from '../controllers/mediaController';
-import { authenticate, authorize, optionalAuth } from '../middleware/authMiddleware';
+import { mediaController } from '../controllers/mediaController.js';
+import { authenticate, authorize, optionalAuth } from '../middleware/authMiddleware.js';
 
 const router = Router();
 

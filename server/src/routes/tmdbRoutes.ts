@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { tmdbController } from '../controllers/tmdbController';
-import { authenticate, authorize } from '../middleware/authMiddleware';
+import { tmdbController } from '../controllers/tmdbController.js';
+import { authenticate, authorize } from '../middleware/authMiddleware.js';
 
 const router = Router();
 

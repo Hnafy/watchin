@@ -1,6 +1,6 @@
-import { WatchHistory, Media } from '../db/models';
-import { AppError } from '../utils/AppError';
-import { mediaCountsMap } from '../db/utils';
+import { WatchHistory, Media } from '../db/models.js';
+import { AppError } from '../utils/AppError.js';
+import { mediaCountsMap } from '../db/utils.js';
 
 export const watchHistoryService = {
   async updateProgress(

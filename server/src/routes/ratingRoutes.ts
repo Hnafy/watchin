@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { ratingController } from '../controllers/ratingController';
-import { authenticate, optionalAuth } from '../middleware/authMiddleware';
-import { validate, rateMediaSchema } from '../utils/validators';
+import { ratingController } from '../controllers/ratingController.js';
+import { authenticate, optionalAuth } from '../middleware/authMiddleware.js';
+import { validate, rateMediaSchema } from '../utils/validators.js';
 
 const router = Router();
 

@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { config } from '../config';
-import { WatchHistory, Rating, WatchlistItem, Media } from '../db/models';
-import { escapeRegex, mediaCountsMap } from '../db/utils';
+import { config } from '../config/index.js';
+import { WatchHistory, Rating, WatchlistItem, Media } from '../db/models.js';
+import { escapeRegex, mediaCountsMap } from '../db/utils.js';
 
 let genAI: GoogleGenerativeAI | null = null;
 let model: any = null;

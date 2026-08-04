@@ -14,7 +14,7 @@ import {
   TrendingMedia,
   PageView,
   isValidId,
-} from '../db/models';
+} from '../db/models.js';
 import {
   escapeRegex,
   slugify,
@@ -24,8 +24,8 @@ import {
   ensureKeyword,
   attachCountsToMedia,
   mediaCountsMap,
-} from '../db/utils';
-import { AppError } from '../utils/AppError';
+} from '../db/utils.js';
+import { AppError } from '../utils/AppError.js';
 
 interface SearchQuery {
   q?: string;

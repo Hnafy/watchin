@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { watchHistoryController } from '../controllers/watchHistoryController';
-import { authenticate } from '../middleware/authMiddleware';
-import { validate, updateProgressSchema, markCompletedSchema } from '../utils/validators';
+import { watchHistoryController } from '../controllers/watchHistoryController.js';
+import { authenticate } from '../middleware/authMiddleware.js';
+import { validate, updateProgressSchema, markCompletedSchema } from '../utils/validators.js';
 
 const router = Router();
 router.use(authenticate);

@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
-import { watchlistService } from '../services/watchlistService';
-import { AuthRequest } from '../middleware/authMiddleware';
+import { watchlistService } from '../services/watchlistService.js';
+import { AuthRequest } from '../middleware/authMiddleware.js';
 
 export const watchlistController = {
   async getWatchlist(req: AuthRequest, res: Response, next: NextFunction) {

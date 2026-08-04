@@ -1,6 +1,6 @@
-import app from './app';
-import { config } from './config';
-import { connectDB, disconnectDB } from './db';
+import app from './app.js';
+import { config } from './config/index.js';
+import { connectDB, disconnectDB } from './db/index.js';
 
 const REQUIRED_ENV_VARS = [
   'MONGODB_URI',

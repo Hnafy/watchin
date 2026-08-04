@@ -2,21 +2,21 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
-import { config } from './config';
-import { errorHandler, notFoundHandler } from './middleware/errorMiddleware';
-import { requestLogger } from './middleware/requestLogger';
+import { config } from './config/index.js';
+import { errorHandler, notFoundHandler } from './middleware/errorMiddleware.js';
+import { requestLogger } from './middleware/requestLogger.js';
 
-import authRoutes from './routes/authRoutes';
-import mediaRoutes from './routes/mediaRoutes';
-import watchlistRoutes from './routes/watchlistRoutes';
-import ratingRoutes from './routes/ratingRoutes';
-import watchHistoryRoutes from './routes/watchHistoryRoutes';
-import adminRoutes from './routes/adminRoutes';
-import userRoutes from './routes/userRoutes';
-import notificationRoutes from './routes/notificationRoutes';
-import tmdbRoutes from './routes/tmdbRoutes';
-import recommendationRoutes from './routes/recommendationRoutes';
-import adsRoutes from './routes/adsRoutes';
+import authRoutes from './routes/authRoutes.js';
+import mediaRoutes from './routes/mediaRoutes.js';
+import watchlistRoutes from './routes/watchlistRoutes.js';
+import ratingRoutes from './routes/ratingRoutes.js';
+import watchHistoryRoutes from './routes/watchHistoryRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import tmdbRoutes from './routes/tmdbRoutes.js';
+import recommendationRoutes from './routes/recommendationRoutes.js';
+import adsRoutes from './routes/adsRoutes.js';
 
 const app = express();
 
@@ -37,7 +37,7 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-import { getDb } from './db';
+import { getDb } from './db/index.js';
 
 app.get(['/', '/health', '/api/health'], (_req, res) => {
   res.json({

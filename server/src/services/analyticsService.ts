@@ -1,6 +1,6 @@
-import { Media, AdminMediaInput, User, Rating, PageView, DailyStat, SiteSetting, WatchHistory, WatchlistItem, Season, Episode, CastMember, Director, TrendingMedia } from '../db/models';
+import { Media, AdminMediaInput, User, Rating, PageView, DailyStat, SiteSetting, WatchHistory, WatchlistItem, Season, Episode, CastMember, Director, TrendingMedia } from '../db/models.js';
 import { subDays, startOfDay, format } from 'date-fns';
-import { escapeRegex, attachCountsToMedia, mediaCountsMap, userCountsMap } from '../db/utils';
+import { escapeRegex, attachCountsToMedia, mediaCountsMap, userCountsMap } from '../db/utils.js';
 
 export const analyticsService = {
   async trackPageView(path: string, mediaId?: string, ip?: string, userAgent?: string, referer?: string) {

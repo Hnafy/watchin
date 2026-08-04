@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
-import { watchHistoryService } from '../services/watchHistoryService';
-import { AuthRequest } from '../middleware/authMiddleware';
+import { watchHistoryService } from '../services/watchHistoryService.js';
+import { AuthRequest } from '../middleware/authMiddleware.js';
 
 export const watchHistoryController = {
   async updateProgress(req: AuthRequest, res: Response, next: NextFunction) {

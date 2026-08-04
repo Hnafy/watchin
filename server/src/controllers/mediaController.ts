@@ -1,9 +1,9 @@
 import { Response, NextFunction } from 'express';
-import { mediaService } from '../services/mediaService';
-import { analyticsService } from '../services/analyticsService';
-import { AuthRequest } from '../middleware/authMiddleware';
-import { Genre, Country, Person, Media, SearchLog } from '../db/models';
-import { escapeRegex } from '../db/utils';
+import { mediaService } from '../services/mediaService.js';
+import { analyticsService } from '../services/analyticsService.js';
+import { AuthRequest } from '../middleware/authMiddleware.js';
+import { Genre, Country, Person, Media, SearchLog } from '../db/models.js';
+import { escapeRegex } from '../db/utils.js';
 import crypto from 'crypto';
 
 function parseArrayParam(param: unknown): string[] | undefined {

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { authService } from '../services/authService';
-import { AppError } from '../utils/AppError';
+import { authService } from '../services/authService.js';
+import { AppError } from '../utils/AppError.js';
 
 export const authController = {
   async register(req: Request, res: Response, next: NextFunction) {

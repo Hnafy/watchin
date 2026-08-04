@@ -1,6 +1,6 @@
 import { Response, NextFunction } from 'express';
-import { ratingService } from '../services/ratingService';
-import { AuthRequest } from '../middleware/authMiddleware';
+import { ratingService } from '../services/ratingService.js';
+import { AuthRequest } from '../middleware/authMiddleware.js';
 
 export const ratingController = {
   async rateMedia(req: AuthRequest, res: Response, next: NextFunction) {

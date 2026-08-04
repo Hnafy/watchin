@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
-import { User, RefreshToken, Notification } from '../db/models';
-import { generateTokens, verifyRefreshToken } from '../utils/jwt';
-import { AppError } from '../utils/AppError';
-import { config } from '../config';
+import { User, RefreshToken, Notification } from '../db/models.js';
+import { generateTokens, verifyRefreshToken } from '../utils/jwt.js';
+import { AppError } from '../utils/AppError.js';
+import { config } from '../config/index.js';
 
 export const authService = {
   async register(data: { email: string; username: string; password: string }) {

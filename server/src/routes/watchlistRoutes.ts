@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { watchlistController } from '../controllers/watchlistController';
-import { authenticate } from '../middleware/authMiddleware';
-import { validate, addToWatchlistSchema } from '../utils/validators';
+import { watchlistController } from '../controllers/watchlistController.js';
+import { authenticate } from '../middleware/authMiddleware.js';
+import { validate, addToWatchlistSchema } from '../utils/validators.js';
 
 const router = Router();
 router.use(authenticate);

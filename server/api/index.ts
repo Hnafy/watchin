@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
-import app from '../src/app';
-import { connectDB } from '../src/db';
+import app from '../src/app.js';
+import { connectDB } from '../src/db.js';
 
 const HEALTH_PATHS = ['/', '/health', '/api/health'];
 

@@ -11,7 +11,7 @@ import {
   AdminMediaInput,
   User,
   isValidId,
-} from '../db/models';
+} from '../db/models.js';
 import {
   slugify,
   escapeRegex,
@@ -20,8 +20,8 @@ import {
   ensureLanguage,
   ensureKeyword,
   userCountsMap,
-} from '../db/utils';
-import { AppError } from '../utils/AppError';
+} from '../db/utils.js';
+import { AppError } from '../utils/AppError.js';
 
 const clean = (obj: Record<string, any>) => {
   const out: Record<string, any> = {};

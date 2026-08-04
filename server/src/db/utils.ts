@@ -1,4 +1,4 @@
-import { Rating, WatchlistItem, WatchHistory, Genre, Country, Language, Keyword } from './models';
+import { Rating, WatchlistItem, WatchHistory, Genre, Country, Language, Keyword } from './models.js';
 
 export function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

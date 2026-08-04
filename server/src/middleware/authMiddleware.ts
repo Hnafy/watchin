@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyAccessToken, extractTokenFromHeader } from '../utils/jwt';
-import { User } from '../db/models';
-import { AppError } from '../utils/AppError';
+import { verifyAccessToken, extractTokenFromHeader } from '../utils/jwt.js';
+import { User } from '../db/models.js';
+import { AppError } from '../utils/AppError.js';
 
 export interface AuthRequest extends Request {
   user?: {

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { Notification } from '../db/models';
+import { Notification } from '../db/models.js';
 
 export const notificationController = {
   async list(req: Request, res: Response, next: NextFunction) {

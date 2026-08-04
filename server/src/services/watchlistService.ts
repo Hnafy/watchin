@@ -1,6 +1,6 @@
-import { WatchlistItem, Media } from '../db/models';
-import { AppError } from '../utils/AppError';
-import { mediaCountsMap } from '../db/utils';
+import { WatchlistItem, Media } from '../db/models.js';
+import { AppError } from '../utils/AppError.js';
+import { mediaCountsMap } from '../db/utils.js';
 
 export const watchlistService = {
   async getWatchlist(userId: string, page = 1, limit = 20) {

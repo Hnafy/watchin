@@ -1,5 +1,5 @@
-import { Rating, Media } from '../db/models';
-import { AppError } from '../utils/AppError';
+import { Rating, Media } from '../db/models.js';
+import { AppError } from '../utils/AppError.js';
 
 export const ratingService = {
   async rateMedia(userId: string, mediaId: string, value: number) {

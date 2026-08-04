@@ -1,8 +1,8 @@
 import { Response, NextFunction } from 'express';
-import { TrendingMedia, AdEvent } from '../db/models';
-import { analyticsService } from '../services/analyticsService';
-import { adminService } from '../services/adminService';
-import { AuthRequest } from '../middleware/authMiddleware';
+import { TrendingMedia, AdEvent } from '../db/models.js';
+import { analyticsService } from '../services/analyticsService.js';
+import { adminService } from '../services/adminService.js';
+import { AuthRequest } from '../middleware/authMiddleware.js';
 
 export const adminController = {
   // --- Stats & Analytics ---

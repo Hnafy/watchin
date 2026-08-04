@@ -1,8 +1,8 @@
 import { Response, NextFunction } from 'express';
-import { geminiService } from '../services/geminiService';
-import { mediaService } from '../services/mediaService';
-import { recommendationService } from '../services/recommendationService';
-import { AuthRequest } from '../middleware/authMiddleware';
+import { geminiService } from '../services/geminiService.js';
+import { mediaService } from '../services/mediaService.js';
+import { recommendationService } from '../services/recommendationService.js';
+import { AuthRequest } from '../middleware/authMiddleware.js';
 
 export const recommendationController = {
   async getAiRecommendations(req: AuthRequest, res: Response, next: NextFunction) {

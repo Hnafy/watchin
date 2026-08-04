@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { SiteSetting, AdEvent } from '../db/models';
-import { AD_ZONES, AD_GROUP } from '../config/ads';
+import { SiteSetting, AdEvent } from '../db/models.js';
+import { AD_ZONES, AD_GROUP } from '../config/ads.js';
 import crypto from 'crypto';
 
 export const adsController = {

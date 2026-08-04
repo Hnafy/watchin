@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { config } from '../config';
+import { config } from '../config/index.js';
 
 const globalForMongo = globalThis as unknown as { mongoose?: typeof mongoose };
 

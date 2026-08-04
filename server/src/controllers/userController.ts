@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
-import { User, WatchHistory, WatchlistItem, Rating } from '../db/models';
-import { AppError } from '../utils/AppError';
+import { User, WatchHistory, WatchlistItem, Rating } from '../db/models.js';
+import { AppError } from '../utils/AppError.js';
 
 export const userController = {
   async updateProfile(req: Request, res: Response, next: NextFunction) {
