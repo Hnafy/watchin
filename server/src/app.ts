@@ -39,16 +39,12 @@ app.use('/api/', limiter);
 
 import { getDb } from './db';
 
-app.get('/api/health', async (_req, res) => {
-  let dbStatus = 'disconnected';
-  try {
-    await getDb().connection.db!.admin().command({ ping: 1 });
-    dbStatus = 'connected';
-  } catch { dbStatus = 'error'; }
+app.get(['/', '/health', '/api/health'], (_req, res) => {
   res.json({
     status: 'ok',
+    service: 'streaming-server',
     timestamp: new Date().toISOString(),
-    database: dbStatus,
+    database: getDb().connection.readyState === 1 ? 'connected' : 'disconnected',
     uptime: process.uptime(),
   });
 });
