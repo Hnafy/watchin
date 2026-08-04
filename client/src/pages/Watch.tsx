@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { mediaApi } from '../services/api';
-import { watchHistoryApi } from '../services/api';
+import { watchHistoryApi, API_URL } from '../services/api';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
@@ -86,7 +86,7 @@ export function Watch() {
           seasonNumber: currentSeasonNum || undefined,
           episodeNumber: currentEpisodeNum || undefined,
         })], { type: 'application/json' });
-        navigator.sendBeacon('/api/history', blob);
+        navigator.sendBeacon(`${API_URL}/history`, blob);
       }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);

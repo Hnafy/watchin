@@ -16,6 +16,7 @@ import {
   useWatchlistCheck,
 } from '../hooks/useMedia';
 import { useAuth } from '../hooks/useAuth';
+import { API_URL } from '../services/api';
 import { MediaCarousel } from '../components/media/MediaCarousel';
 import { Chip } from '../components/ui/Chip';
 import { Media } from '../types';
@@ -117,7 +118,7 @@ function Hero() {
   const { data: latestMedia = [] } = useQuery<Media[]>({
     queryKey: ['latest-media'],
     queryFn: async () => {
-      const res = await fetch('/api/media/latest?limit=10');
+      const res = await fetch(`${API_URL}/media/latest?limit=10`);
       if (!res.ok) throw new Error(`Failed to fetch latest media: ${res.status}`);
       const json = await res.json();
       return Array.isArray(json?.data) ? (json.data as Media[]) : [];
