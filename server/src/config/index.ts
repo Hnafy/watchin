@@ -21,7 +21,10 @@ export const config = {
   },
   
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origins: (process.env.CLIENT_URL || 'http://localhost:5173')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
     credentials: true,
   },
   

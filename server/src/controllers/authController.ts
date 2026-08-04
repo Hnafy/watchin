@@ -65,13 +65,28 @@ export const authController = {
   },
 };
 
-const setAuthCookies = (res: Response, accessToken: string, refreshToken: string) => {
+const ACCESS_TOKEN_MAX_AGE = 15 * 60 * 1000;
+const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+
+const authCookieOptions = () => {
   const isProduction = process.env.NODE_ENV === 'production';
-  res.cookie('accessToken', accessToken, { httpOnly: true, secure: isProduction, sameSite: 'lax', maxAge: 15 * 60 * 1000 });
-  res.cookie('refreshToken', refreshToken, { httpOnly: true, secure: isProduction, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 });
+  const sameSite = (process.env.COOKIE_SAME_SITE as 'none' | 'lax' | undefined) ?? (isProduction ? 'none' : 'lax');
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite,
+    path: '/',
+  };
+};
+
+const setAuthCookies = (res: Response, accessToken: string, refreshToken: string) => {
+  const base = authCookieOptions();
+  res.cookie('accessToken', accessToken, { ...base, maxAge: ACCESS_TOKEN_MAX_AGE });
+  res.cookie('refreshToken', refreshToken, { ...base, maxAge: REFRESH_TOKEN_MAX_AGE });
 };
 
 const clearAuthCookies = (res: Response) => {
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken');
+  const base = authCookieOptions();
+  res.clearCookie('accessToken', base);
+  res.clearCookie('refreshToken', base);
 };

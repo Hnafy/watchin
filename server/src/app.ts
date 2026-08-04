@@ -22,7 +22,17 @@ const app = express();
 
 app.set('trust proxy', 1);
 
-app.use(cors(config.cors));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || config.cors.origins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
+    credentials: config.cors.credentials,
+  })
+);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
