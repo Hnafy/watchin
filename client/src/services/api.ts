@@ -3,10 +3,31 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 export const API_URL = 'https://watchin-4crs.vercel.app/api';
 // export const API_URL = '/api';
 
+const ACCESS_TOKEN_KEY = 'watchin_accessToken';
+const REFRESH_TOKEN_KEY = 'watchin_refreshToken';
+
+export const getAccessToken = (): string | null => localStorage.getItem(ACCESS_TOKEN_KEY);
+export const getRefreshToken = (): string | null => localStorage.getItem(REFRESH_TOKEN_KEY);
+export const setTokens = (accessToken: string, refreshToken: string) => {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+};
+export const clearTokens = () => {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+};
+
 const api = axios.create({
   baseURL: API_URL,
-  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
+});
+
+api.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
+  return config;
 });
 
 let isRefreshing = false;
@@ -22,6 +43,11 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     if (error.response?.status === 401 && !originalRequest._retry) {
+      const refreshToken = getRefreshToken();
+      if (!refreshToken) {
+        clearTokens();
+        return Promise.reject(error);
+      }
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -30,10 +56,12 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
       try {
-        await api.post('/auth/refresh');
+        const { data } = await api.post('/auth/refresh', { refreshToken });
+        setTokens(data.accessToken, data.refreshToken);
         processQueue(null);
         return api(originalRequest);
       } catch (refreshError) {
+        clearTokens();
         processQueue(refreshError as Error);
         return Promise.reject(refreshError);
       } finally {
@@ -49,7 +77,7 @@ export default api;
 export const authApi = {
   register: (data: { email: string; username: string; password: string }) => api.post('/auth/register', data),
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),
-  logout: () => api.post('/auth/logout'),
+  logout: () => api.post('/auth/logout', { refreshToken: getRefreshToken() }),
   getMe: () => api.get('/auth/me'),
 };
 
