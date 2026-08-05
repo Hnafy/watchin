@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { authApi } from '../services/api';
+import { authApi, setTokens, clearTokens } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import { User } from '../types';
 
@@ -26,17 +26,27 @@ export const useAuth = () => {
 
   const loginMutation = useMutation({
     mutationFn: (data: { email: string; password: string }) => authApi.login(data),
-    onSuccess: (r) => { useAuthStore.getState().setUser(r.data.user); },
+    onSuccess: (r) => {
+      setTokens(r.data.accessToken, r.data.refreshToken);
+      useAuthStore.getState().setUser(r.data.user);
+    },
   });
 
   const registerMutation = useMutation({
     mutationFn: (data: { email: string; username: string; password: string }) => authApi.register(data),
-    onSuccess: (r) => { useAuthStore.getState().setUser(r.data.user); },
+    onSuccess: (r) => {
+      setTokens(r.data.accessToken, r.data.refreshToken);
+      useAuthStore.getState().setUser(r.data.user);
+    },
   });
 
   const logoutMutation = useMutation({
     mutationFn: () => authApi.logout(),
-    onSuccess: () => { useAuthStore.getState().logout(); qc.invalidateQueries(); },
+    onSettled: () => {
+      clearTokens();
+      useAuthStore.getState().logout();
+      qc.invalidateQueries();
+    },
   });
 
   return {
