@@ -17,7 +17,7 @@ export const authenticate = async (
   next: NextFunction
 ) => {
   try {
-    const token = extractTokenFromHeader(req.headers.authorization) || req.cookies?.accessToken;
+    const token = extractTokenFromHeader(req.headers.authorization);
     if (!token) {
       throw AppError.unauthorized('Authentication required');
     }
@@ -56,7 +56,7 @@ export const optionalAuth = async (
   next: NextFunction
 ) => {
   try {
-    const token = extractTokenFromHeader(req.headers.authorization) || req.cookies?.accessToken;
+    const token = extractTokenFromHeader(req.headers.authorization);
     if (token) {
       const decoded = verifyAccessToken(token);
       const user = await User.findById(decoded.userId).select('id email role');
