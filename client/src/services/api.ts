@@ -148,13 +148,6 @@ export const notificationApi = {
   deleteAllRead: () => api.delete('/notifications/read-all'),
 };
 
-export const notificationApi = {
-  getList: (limit = 20) => api.get('/notifications', { params: { limit } }),
-  markRead: (id: string) => api.post(`/notifications/${id}/read`),
-  markAllRead: () => api.post('/notifications/read-all'),
-  deleteAllRead: () => api.delete('/notifications/read-all'),
-};
-
 export const searchApi = {
   suggest: (q: string, limit = 6) => api.get('/media/suggest', { params: { q, limit } }),
   trendingSearches: () => api.get('/media/trending-searches'),
