@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Search, User, LogOut, Heart, LayoutDashboard, Settings, SlidersHorizontal, Film, Tv, Zap, Sparkles } from 'lucide-react';
+import { Menu, X, Search, User, LogOut, Heart, LayoutDashboard, Settings, SlidersHorizontal, Film, Tv, Zap, Sparkles, Bell, ListMusic } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { FilterPopover } from '../search/FilterPopover';
 import { SearchFilters } from '../../types';
@@ -180,12 +180,25 @@ export const Header = () => {
             </div>
           </form>
 
-          {/* Watchlist */}
-          <Link to="/watchlist" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block">
-            <Heart className="h-5 w-5" />
-          </Link>
+            {/* Watchlist */}
+            <Link to="/watchlist" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block">
+              <Heart className="h-5 w-5" />
+            </Link>
 
-          {/* User Menu */}
+            {/* Playlists */}
+            <Link to="/playlists" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block">
+              <ListMusic className="h-5 w-5" />
+            </Link>
+
+            {/* Notifications */}
+            <Link to="/notifications" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block relative">
+              <Bell className="h-5 w-5" />
+              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs font-medium flex items-center justify-center">
+                3
+              </span>
+            </Link>
+
+            {/* User Menu */}
           <div className="relative" ref={menuRef}>
             <button onClick={() => setUserMenuOpen(!userMenuOpen)}
               className="p-1 rounded-lg hover:bg-white/8 transition-colors">

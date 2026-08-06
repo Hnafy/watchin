@@ -52,6 +52,9 @@ export const userController = {
         WatchHistory.deleteMany({ userId }),
         WatchlistItem.deleteMany({ userId }),
         Rating.deleteMany({ userId }),
+        FriendRequest.deleteMany({ $or: [{ fromUserId: userId }, { toUserId: userId }] }),
+        Follow.deleteMany({ $or: [{ followerId: userId }, { followedId: userId }] }),
+        Playlist.deleteMany({ userId }),
       ]);
       res.json({ status: 'success', message: 'Account deleted' });
     } catch (error) {
@@ -59,6 +62,292 @@ export const userController = {
     }
   },
 
+  // Friend requests
+  async sendFriendRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const fromUserId = (req as any).user.id;
+      const { toUserId } = req.body;
+
+      if (fromUserId === toUserId) throw AppError.badRequest('Cannot send friend request to yourself');
+
+      const existing = await FriendRequest.findOne({ fromUserId, toUserId });
+      if (existing) {
+        if (existing.status === 'PENDING') throw AppError.badRequest('Friend request already sent');
+        if (existing.status === 'ACCEPTED') throw AppError.badRequest('Already friends');
+      }
+
+      const reverse = await FriendRequest.findOne({ fromUserId: toUserId, toUserId: fromUserId });
+      if (reverse && reverse.status === 'PENDING') {
+        await FriendRequest.updateOne(
+          { fromUserId: toUserId, toUserId: fromUserId },
+          { $set: { status: 'ACCEPTED' } }
+        );
+        await Follow.create([{ followerId: fromUserId, followedId: toUserId }, { followerId: toUserId, followedId: fromUserId }]);
+        await Promise.all([
+          createNotification(fromUserId, toUserId, 'FRIEND_REQUEST', 'You are now friends!', `/profile/${toUserId}`),
+          createNotification(toUserId, fromUserId, 'FRIEND_REQUEST', 'Accepted your friend request!', `/profile/${fromUserId}`),
+        ]);
+        res.json({ status: 'success', message: 'Friend request accepted' });
+        return;
+      }
+
+      await FriendRequest.create({ fromUserId, toUserId, status: 'PENDING' });
+      await createNotification(toUserId, fromUserId, 'FRIEND_REQUEST', `${(await User.findById(fromUserId)).username} sent you a friend request`, `/profile/${fromUserId}`);
+
+      res.json({ status: 'success', message: 'Friend request sent' });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async respondFriendRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { requestId, action } = req.body;
+
+      const request = await FriendRequest.findById(requestId);
+      if (!request) throw AppError.notFound('Friend request not found');
+      if (request.toUserId.toString() !== userId) throw AppError.forbidden('Not authorized to respond');
+
+      if (action === 'accept') {
+        request.status = 'ACCEPTED';
+        await request.save();
+        await Follow.create([{ followerId: request.fromUserId, followedId: request.toUserId }, { followerId: request.toUserId, followedId: request.fromUserId }]);
+        await createNotification(request.fromUserId, request.toUserId, 'FRIEND_REQUEST', 'Accepted your friend request!', `/profile/${request.fromUserId}`);
+        res.json({ status: 'success', message: 'Friend request accepted' });
+      } else {
+        request.status = 'DECLINED';
+        await request.save();
+        await createNotification(request.fromUserId, request.toUserId, 'FRIEND_REQUEST', 'Declined your friend request', `/profile/${request.fromUserId}`);
+        res.json({ status: 'success', message: 'Friend request declined' });
+      }
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async cancelFriendRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { requestId } = req.body;
+
+      const request = await FriendRequest.findById(requestId);
+      if (!request) throw AppError.notFound('Friend request not found');
+      if (request.fromUserId.toString() !== userId) throw AppError.forbidden('Not authorized to cancel');
+
+      await FriendRequest.deleteOne({ _id: requestId });
+      res.json({ status: 'success', message: 'Friend request cancelled' });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async removeFriend(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { friendId } = req.body;
+
+      await Follow.deleteMany({ $or: [{ followerId: userId, followedId: friendId }, { followerId: friendId, followedId: userId }] });
+      res.json({ status: 'success', message: 'Friend removed' });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Follow/Unfollow
+  async toggleFollow(req: Request, res: Response, next: NextFunction) {
+    try {
+      const followerId = (req as any).user.id;
+      const { followingId } = req.body;
+
+      if (followerId === followingId) throw AppError.badRequest('Cannot follow yourself');
+
+      const existing = await Follow.findOne({ followerId, followedId: followingId });
+      if (existing) {
+        await Follow.deleteOne({ _id: existing._id });
+        await createNotification(followingId, followerId, 'FOLLOW', `${(await User.findById(followerId)).username} unfollowed you`, `/profile/${followerId}`);
+        res.json({ status: 'success', message: 'Unfollowed' });
+        return;
+      }
+
+      await Follow.create({ followerId, followedId: followingId });
+      await createNotification(followingId, followerId, 'FOLLOW', `${(await User.findById(followerId)).username} started following you`, `/profile/${followerId}`);
+      res.json({ status: 'success', message: 'Following' });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getFollowStats(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+
+      const [followers, followings] = await Promise.all([
+        Follow.countDocuments({ followedId: userId }),
+        Follow.countDocuments({ followerId: userId }),
+      ]);
+
+      res.json({
+        status: 'success',
+        data: { followers, followings },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Playlists
+  async createPlaylist(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { title, description, visibility = 'PUBLIC', items = [] } = req.body;
+
+      const playlist = await Playlist.create({
+        title,
+        description,
+        userId,
+        visibility,
+        items,
+      });
+
+      res.json({ status: 'success', data: playlist });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getPlaylist(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { playlistId } = req.params;
+
+      const playlist = await Playlist.findOne({ _id: playlistId, $or: [{ userId }, { visibility: 'PUBLIC' }] });
+      if (!playlist) throw AppError.notFound('Playlist not found');
+
+      res.json({ status: 'success', data: playlist });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async updatePlaylist(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { playlistId } = req.params;
+      const { title, description, visibility, items } = req.body;
+
+      const playlist = await Playlist.findOneAndUpdate(
+        { _id: playlistId, userId },
+        { $set: { ...(title && { title }), ...(description !== undefined && { description }), ...(visibility && { visibility }), ...(items && { items }), updatedAt: new Date() } },
+        { new: true }
+      );
+
+      if (!playlist) throw AppError.notFound('Playlist not found');
+
+      res.json({ status: 'success', data: playlist });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async deletePlaylist(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { playlistId } = req.params;
+
+      const playlist = await Playlist.findOneAndDelete({ _id: playlistId, userId });
+      if (!playlist) throw AppError.notFound('Playlist not found');
+
+      res.json({ status: 'success', message: 'Playlist deleted' });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async addItemToPlaylist(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { playlistId } = req.params;
+      const { mediaId, progress = 0, rating = null, notes = null } = req.body;
+
+      const playlist = await Playlist.findOneAndUpdate(
+        { _id: playlistId, userId },
+        { $push: { items: { mediaId, addedAt: new Date(), progress, rating, notes } }, updatedAt: new Date() },
+        { new: true }
+      );
+
+      if (!playlist) throw AppError.notFound('Playlist not found');
+
+      res.json({ status: 'success', data: playlist });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async removeItemFromPlaylist(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { playlistId, mediaId } = req.params;
+
+      const playlist = await Playlist.findOneAndUpdate(
+        { _id: playlistId, userId },
+        { $pull: { items: { mediaId } }, updatedAt: new Date() },
+        { new: true }
+      );
+
+      if (!playlist) throw AppError.notFound('Playlist not found');
+
+      res.json({ status: 'success', data: playlist });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getUserPlaylists(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+
+      const playlists = await Playlist.find({ userId }).sort({ createdAt: -1 });
+
+      res.json({ status: 'success', data: playlists });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Notifications
+  async getNotifications(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+
+      const notifications = await Notification.find({ userId }).sort({ createdAt: -1 });
+
+      res.json({ status: 'success', data: notifications });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async markNotificationAsRead(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const { notificationId } = req.params;
+
+      const notification = await Notification.findOneAndUpdate(
+        { _id: notificationId, userId },
+        { $set: { read: true } },
+        { new: true }
+      );
+
+      if (!notification) throw AppError.notFound('Notification not found');
+
+      res.json({ status: 'success', data: notification });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Avatar upload
   async uploadAvatar(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
@@ -101,6 +390,7 @@ export const userController = {
     }
   },
 
+  // Existing methods...
   async updateProfile(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
@@ -193,3 +483,22 @@ export const userController = {
     }
   },
 };
+
+async function createNotification(
+  recipientId: string,
+  senderId: string,
+  type: string,
+  title: string,
+  link?: string
+) {
+  await Notification.create({
+    userId: recipientId,
+    type,
+    title,
+    body: `${(await User.findById(senderId)).username} ${type.toLowerCase().replace('_', ' ')}`,
+    link,
+    relatedUserId: senderId,
+    createdAt: new Date(),
+  });
+}
+

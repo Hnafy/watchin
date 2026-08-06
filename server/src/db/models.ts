@@ -82,6 +82,75 @@ const RefreshTokenSchema = new Schema(
 export const RefreshToken = model('RefreshToken', RefreshTokenSchema);
 
 // ---------------------------------------------------------------------------
+// Friend Request
+// ---------------------------------------------------------------------------
+const FriendRequestSchema = new Schema(
+  {
+    fromUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    toUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    status: {
+      type: String,
+      enum: ['PENDING', 'ACCEPTED', 'DECLINED', 'CANCELED'],
+      default: 'PENDING',
+      index: true,
+    },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { ...baseOptions, timestamps: true, collection: 'friendrequests' }
+);
+
+FriendRequestSchema.index({ fromUserId: 1, toUserId: 1 }, { unique: true });
+export const FriendRequest = model('FriendRequest', FriendRequestSchema);
+
+// ---------------------------------------------------------------------------
+// Follow
+// ---------------------------------------------------------------------------
+const FollowSchema = new Schema(
+  {
+    followerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    followedId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { ...baseOptions, timestamps: true, collection: 'follows' }
+);
+
+FollowSchema.index({ followerId: 1, followedId: 1 }, { unique: true });
+export const Follow = model('Follow', FollowSchema);
+
+// ---------------------------------------------------------------------------
+// Playlist
+// ---------------------------------------------------------------------------
+const PlaylistSchema = new Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    description: { type: String, default: null },
+    coverImage: { type: String, default: null },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    visibility: {
+      type: String,
+      enum: ['PUBLIC', 'PRIVATE'],
+      default: 'PUBLIC',
+      index: true,
+    },
+    items: [
+      {
+        mediaId: { type: String, required: true },
+        addedAt: { type: Date, default: Date.now },
+        progress: { type: Number, default: 0 },
+        rating: { type: Number, min: 1, max: 10, default: null },
+        notes: { type: String, default: null, trim: true },
+      },
+    ],
+    createdAt: { type: Date, default: Date.now, index: true },
+    updatedAt: { type: Date, default: Date.now, index: true },
+  },
+  { ...baseOptions, timestamps: true, collection: 'playlists' }
+);
+
+PlaylistSchema.index({ userId: 1, createdAt: -1 });
+export const Playlist = model('Playlist', PlaylistSchema);
+
+// ---------------------------------------------------------------------------
 // Media
 // ---------------------------------------------------------------------------
 const MediaSchema = new Schema(
@@ -489,17 +558,20 @@ const NotificationSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     type: {
       type: String,
-      enum: ['WELCOME', 'SYSTEM', 'ADMIN', 'WATCHLIST', 'RATING', 'REPLY', 'CONTENT'],
+      enum: ['WELCOME', 'SYSTEM', 'ADMIN', 'WATCHLIST', 'RATING', 'REPLY', 'CONTENT', 'FRIEND_REQUEST', 'FOLLOW', 'PLAYLIST', 'LIKE'],
       default: 'SYSTEM',
     },
     title: { type: String, required: true },
     body: { type: String, default: null },
     link: { type: String, default: null },
     read: { type: Boolean, default: false, index: true },
+    relatedId: { type: String, default: null }, // friend request id, playlist id, etc.
+    relatedUserId: { type: Schema.Types.ObjectId, ref: 'User', default: null }, // sender of notification
     createdAt: { type: Date, default: Date.now, index: true },
   },
   { ...baseOptions, collection: 'notifications' }
 );
+
 NotificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
 export const Notification = model('Notification', NotificationSchema);
 

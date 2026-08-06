@@ -60,6 +60,32 @@ export const userSettingsSchema = z.object({
   }).optional(),
 }).strict();
 
+export const friendRequestSchema = z.object({
+  toUserId: z.string().min(1),
+});
+
+export const playlistSchema = z.object({
+  title: z.string().min(1).max(100),
+  description: z.string().max(1000).optional(),
+  visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
+  items: z.array(z.object({
+    mediaId: z.string().min(1),
+    progress: z.number().min(0).max(100).optional(),
+    rating: z.number().min(1).max(10).optional(),
+    notes: z.string().max(500).optional(),
+  })).optional(),
+});
+
+export const updatePlaylistItemSchema = z.object({
+  progress: z.number().min(0).max(100).optional(),
+  rating: z.number().min(1).max(10).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export const mediaLikeSchema = z.object({
+  mediaId: z.string().min(1),
+});
+
 export const mediaQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
