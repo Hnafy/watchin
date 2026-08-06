@@ -37,4 +37,10 @@ router.delete('/playlists/:playlistId/items/:mediaId', userController.removeItem
 router.get('/notifications', userController.getNotifications);
 router.patch('/notifications/:notificationId/read', userController.markNotificationAsRead);
 
+// Public profile
+router.get('/profile/:username', userController.getProfile);
+router.get('/profile/:username/friends', userController.getUserFriends);
+router.get('/profile/:username/following', userController.getUserFriends);
+router.get('/profile/:username/followers', userController.getUserFriends);
+
 export default router;

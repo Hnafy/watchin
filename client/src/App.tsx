@@ -16,8 +16,8 @@ import { Register } from './pages/Auth/Register';
 import { Search } from './pages/Search';
 import { Watchlist } from './pages/Watchlist';
 import { Profile } from './pages/Profile';
+import { ProfileFriends } from './pages/ProfileFriends';
 import { Settings } from './pages/Settings';
-import { History } from './pages/History';
 import { AdminDashboard } from './pages/Admin/Dashboard';
 import { AdminMediaForm } from './pages/Admin/MediaForm';
 import { AdminMediaManager } from './pages/Admin/MediaManager';
@@ -87,6 +87,9 @@ function AnimatedRoutes() {
           <Route path="/register" element={<Register />} />
           <Route path="/watchlist" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/profile/:username/friends" element={<ProtectedRoute><ProfileFriends /></ProtectedRoute>} />
+          <Route path="/profile/:username/following" element={<ProtectedRoute><ProfileFriends /></ProtectedRoute>} />
+          <Route path="/profile/:username/followers" element={<ProtectedRoute><ProfileFriends /></ProtectedRoute>} />
           <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

@@ -196,6 +196,68 @@ export const userController = {
     }
   },
 
+  async getUserFriends(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { username } = req.params;
+      const mode = req.query.mode as string || 'friends';
+
+      const targetUser = await User.findOne({ username }).select('_id');
+      if (!targetUser) throw AppError.notFound('User not found');
+
+      let friends: any[] = [];
+
+      if (mode === 'friends') {
+        const followPairs = await Follow.find({
+          $or: [
+            { followerId: targetUser._id, followedId: { $ne: targetUser._id } },
+            { followedId: targetUser._id, followerId: { $ne: targetUser._id } },
+          ],
+        }).populate('followerId', 'username avatar role createdAt').populate('followedId', 'username avatar role createdAt');
+
+        const userMap = new Map();
+        followPairs.forEach((pair) => {
+          const friend = pair.followerId._id.toString() === targetUser._id.toString()
+            ? pair.followedId
+            : pair.followerId;
+          if (!userMap.has(friend._id.toString())) {
+            userMap.set(friend._id.toString(), friend);
+          }
+        });
+
+        friends = Array.from(userMap.values());
+      } else if (mode === 'following') {
+        const following = await Follow.find({ followerId: targetUser._id }).populate('followedId', 'username avatar role createdAt');
+        friends = following.map((pair) => pair.followedId);
+      } else if (mode === 'followers') {
+        const followers = await Follow.find({ followedId: targetUser._id }).populate('followerId', 'username avatar role createdAt');
+        friends = followers.map((pair) => pair.followerId);
+      }
+
+      res.json({
+        status: 'success',
+        data: friends,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { username } = req.params;
+
+      const user = await User.findOne({ username }).select('id username avatar role emailVerified createdAt');
+      if (!user) throw AppError.notFound('User not found');
+
+      res.json({
+        status: 'success',
+        data: user,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   // Playlists
   async createPlaylist(req: Request, res: Response, next: NextFunction) {
     try {
