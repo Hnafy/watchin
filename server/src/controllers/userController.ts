@@ -18,6 +18,21 @@ function flattenSettings(obj: Record<string, any>, prefix = ''): Record<string, 
 }
 
 export const userController = {
+  async deleteAllReadNotifications(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+
+      await Notification.deleteMany({ userId, read: true });
+
+      res.json({
+        status: 'success',
+        message: 'Read notifications cleared',
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async getSettings(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
@@ -196,6 +211,22 @@ export const userController = {
     }
   },
 
+  async getProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { username } = req.params;
+
+      const user = await User.findOne({ username }).select('id username avatar role emailVerified createdAt');
+      if (!user) throw AppError.notFound('User not found');
+
+      res.json({
+        status: 'success',
+        data: user,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async getUserFriends(req: Request, res: Response, next: NextFunction) {
     try {
       const { username } = req.params;
@@ -242,16 +273,15 @@ export const userController = {
     }
   },
 
-  async getProfile(req: Request, res: Response, next: NextFunction) {
+  async deleteAllReadNotifications(req: Request, res: Response, next: NextFunction) {
     try {
-      const { username } = req.params;
+      const userId = (req as any).user.id;
 
-      const user = await User.findOne({ username }).select('id username avatar role emailVerified createdAt');
-      if (!user) throw AppError.notFound('User not found');
+      await Notification.deleteMany({ userId, read: true });
 
       res.json({
         status: 'success',
-        data: user,
+        message: 'Read notifications cleared',
       });
     } catch (error) {
       next(error);

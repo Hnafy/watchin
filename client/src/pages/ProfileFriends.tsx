@@ -14,20 +14,20 @@ interface Friend {
 }
 
 export function ProfileFriends() {
-  const { username, tab } = useParams<{ username: string; tab: string }>();
+  const { username, tab } = useParams<{ username?: string; tab?: string }>();
   const { t } = useI18n();
   const mode = tab === 'following' ? 'following' : tab === 'followers' ? 'followers' : 'friends';
 
   const { data: friends } = useQuery({
     queryKey: ['profile', username, 'friends', mode],
-    queryFn: () => userApi.getUserFriends(username, mode).then((r) => r.data.data as Friend[]),
-    enabled: !!username,
+    queryFn: () => username && mode ? userApi.getUserFriends(username, mode).then((r) => r.data.data as Friend[]) : Promise.resolve([]),
+    enabled: !!username && !!mode,
     staleTime: 60_000,
   });
 
   const { data: profile } = useQuery({
     queryKey: ['profile', username],
-    queryFn: () => userApi.getProfile(username).then((r) => r.data.data),
+    queryFn: () => username ? userApi.getProfile(username).then((r) => r.data.data) : Promise.resolve(null),
     enabled: !!username,
     staleTime: 60_000,
   });

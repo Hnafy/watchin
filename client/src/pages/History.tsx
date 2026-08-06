@@ -24,7 +24,7 @@ export function HistoryPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['history', 'all', page],
-    queryFn: () => watchHistoryApi.getHistory(page, pageSize).then((r) => r.data),
+    queryFn: () => watchHistoryApi.getHistory(page, pageSize).then((r) => r.data as { data: any[]; pagination: any; }),
     staleTime: 60_000,
   });
 
