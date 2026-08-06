@@ -228,6 +228,8 @@ export const Header = () => {
                       {[
                         { to: '/profile', icon: User, label: 'Profile' },
                         { to: '/watchlist', icon: Heart, label: 'Watchlist' },
+                        { to: '/playlists', icon: ListMusic, label: 'Playlists' },
+                        { to: '/notifications', icon: Bell, label: 'Notifications' },
                         { to: '/settings', icon: Settings, label: 'Settings' },
                         ...(user.role === 'ADMIN' || user.role === 'MODERATOR'
                           ? [{ to: '/admin', icon: LayoutDashboard, label: 'Admin' }]
