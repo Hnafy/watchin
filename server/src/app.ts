@@ -17,6 +17,8 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import tmdbRoutes from './routes/tmdbRoutes.js';
 import recommendationRoutes from './routes/recommendationRoutes.js';
 import adsRoutes from './routes/adsRoutes.js';
+import mixdropRoutes from './routes/mixdropRoutes.js';
+import commentRoutes from './routes/commentRoutes.js';
 
 const app = express();
 
@@ -70,6 +72,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/tmdb', tmdbRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/ads', adsRoutes);
+app.use('/api/mixdrop', mixdropRoutes);
+app.use('/api/comments', commentRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

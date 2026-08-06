@@ -1,17 +1,19 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { adminApi, mediaApi } from '../../services/api';
+import { adminApi, mediaApi, mixdropApi } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import { Input, Textarea } from '../../components/ui/Input';
-import { Media, Person } from '../../types';
+import { Media, Person, MediaSource } from '../../types';
 import toast from 'react-hot-toast';
 import { StarRating } from '../../components/ui/StarRating';
 import { SeasonEpisodeForm, SeasonDraft } from '../../components/admin/SeasonEpisodeForm';
+import { VideoPlayer } from '../../components/media/VideoPlayer';
 import {
   ArrowLeft, Save, Film, Tag, Star, Users, Loader2, X, Plus, Search,
-  Link as LinkIcon, Image as ImageIcon, Wand2, Calendar, Play, LayoutGrid, Check,
+  Link as LinkIcon, Image as ImageIcon, Wand2, Calendar, Play, LayoutGrid, Check, UploadCloud,
+  ChevronDown, ChevronRight, Server as ServerIcon,
 } from 'lucide-react';
 
 interface MediaFormData {
@@ -32,7 +34,7 @@ interface MediaFormData {
   backdropUrl: string;
   logoUrl: string;
   trailerUrl: string;
-  watchUrl: string;
+  sources: MediaSource[];
   genres: string[];
   keywords: string[];
   countries: string[];
@@ -50,7 +52,7 @@ const defaultForm: MediaFormData = {
   type: 'MOVIE', releaseDate: '', firstAirDate: '', productionYear: '',
   runtime: '', numberOfSeasons: '', numberOfEpisodes: '',
   imdbRating: '', quality: '',
-  posterUrl: '', backdropUrl: '', logoUrl: '', trailerUrl: '', watchUrl: '',
+  posterUrl: '', backdropUrl: '', logoUrl: '', trailerUrl: '', sources: [],
   genres: [], keywords: [], countries: [], languages: [],
   seasons: [], cast: [], directors: [], featured: false, isTrending: false, hidden: false,
 };
@@ -68,7 +70,6 @@ const URL_FIELDS: { key: keyof MediaFormData; label: string; placeholder: string
   { key: 'backdropUrl', label: 'Backdrop URL', placeholder: 'https://...', errorKey: 'backdropUrl' },
   { key: 'logoUrl', label: 'Logo URL', placeholder: 'https://...' },
   { key: 'trailerUrl', label: 'Trailer URL', placeholder: 'https://youtube.com/...' },
-  { key: 'watchUrl', label: 'Watch URL', placeholder: 'https://...' },
 ];
 
 function extractPersonId(input: string): string | null {
@@ -132,7 +133,11 @@ export function AdminMediaForm() {
         backdropUrl: existingMedia.backdropUrl || '',
         logoUrl: existingMedia.logoUrl || '',
         trailerUrl: existingMedia.trailerUrl || '',
-        watchUrl: existingMedia.watchUrl || '',
+        sources: existingMedia.sources?.length
+          ? existingMedia.sources.map(s => ({ server: s.server || '', label: s.label || '', url: s.url }))
+          : (existingMedia.watchUrl
+              ? [{ server: '', label: existingMedia.quality || 'HD', url: existingMedia.watchUrl }]
+              : []),
         genres: existingMedia.genres.map(g => g.name),
         keywords: existingMedia.keywords?.map(k => k.name) || [],
         countries: existingMedia.countries.map(c => c.code),
@@ -144,6 +149,7 @@ export function AdminMediaForm() {
             episodeNumber: ep.episodeNumber,
             title: ep.name,
             watchUrl: ep.watchUrl || '',
+            sources: ep.sources?.map((src: any) => ({ server: src.server || '', label: src.label || '', url: src.url })) || [],
           })),
         })) || [],
         cast: existingMedia.cast?.map(c => ({ personId: c.person.id, name: c.person.name, character: c.character || '' })) || [],
@@ -196,7 +202,8 @@ export function AdminMediaForm() {
         backdropUrl: data.backdropUrl || null,
         logoUrl: data.logoUrl || null,
         trailerUrl: data.trailerUrl || null,
-        watchUrl: data.watchUrl || null,
+        sources: data.sources.filter(s => s.url.trim()),
+        watchUrl: data.sources.find(s => s.url.trim())?.url.trim() || null,
         genres: data.genres,
         keywords: data.keywords,
         countries: data.countries,
@@ -325,7 +332,7 @@ export function AdminMediaForm() {
   );
 
   return (
-    <div className="min-h-screen bg-dark-950">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8 pb-28">
         {/* Header */}
         <motion.div
@@ -334,8 +341,8 @@ export function AdminMediaForm() {
           className="flex items-center gap-4 mb-8"
         >
           <motion.button whileHover={{ x: -3 }} onClick={() => navigate('/admin')}
-            className="p-2.5 rounded-lg bg-dark-800 text-dark-300 hover:text-white hover:bg-dark-700 transition-colors">
-            <ArrowLeft className="h-5 w-5" />
+            className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-xl transition-all hover:-translate-x-0.5 hover:border-white/25 hover:bg-white/10 hover:text-white">
+            <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5" />
           </motion.button>
           <div>
             <div className="flex items-center gap-2 text-sm text-dark-400">
@@ -406,7 +413,7 @@ export function AdminMediaForm() {
                     <div className="relative">
                       <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dark-500" />
                       <input
-                        type="url"
+                        type="text"
                         value={form[f.key] as string}
                         onChange={handleChange(f.key)}
                         placeholder={f.placeholder}
@@ -420,6 +427,22 @@ export function AdminMediaForm() {
                     {f.errorKey && errors[f.errorKey] && <p className="mt-1 text-xs text-red-400">{errors[f.errorKey]}</p>}
                   </div>
                 ))}
+
+                {/* Watch sources */}
+                <div className="pt-2 border-t border-dark-800">
+                  <WatchSourcesEditor
+                    sources={form.sources}
+                    onChange={(sources) => update('sources', sources)}
+                  />
+                  <p className="text-[11px] text-dark-500 mt-1">
+                    Group sources by <span className="text-dark-400">server</span> (e.g. Server 1, Server 2, Mixdrop) and give
+                    each one a <span className="text-dark-400">quality</span> label (e.g. HD, FHD, 4K). Viewers pick a server,
+                    then a quality, on the watch page. Each source accepts a direct file link ({' '}
+                    <span className="text-dark-400">.mp4</span>,{' '}
+                    <span className="text-dark-400">.webm</span>), an HLS stream (<span className="text-dark-400">.m3u8</span>),
+                    a YouTube link, or a full iframe embed code.
+                  </p>
+                </div>
               </div>
             </motion.section>
 
@@ -663,6 +686,19 @@ export function AdminMediaForm() {
                   )}
                 </div>
               </div>
+              {form.sources.find(s => s.url.trim()) && (
+                <div className="mt-4 overflow-hidden rounded-xl border border-dark-600/60 bg-black">
+                  <VideoPlayer
+                    src={form.sources.find(s => s.url.trim())!.url.trim()}
+                    title={form.title || 'Video source preview'}
+                    autoPlay={false}
+                    className="aspect-video"
+                  />
+                  <p className="flex items-center gap-1.5 px-3 py-2 text-[11px] text-dark-500">
+                    <Play className="h-3 w-3 text-primary-500" /> Live video source preview
+                  </p>
+                </div>
+              )}
               <div className="mt-3 flex items-center gap-2 text-xs text-dark-500">
                 <Check className="h-3.5 w-3.5 text-green-500" />
                 Preview updates live as you type.
@@ -689,6 +725,244 @@ export function AdminMediaForm() {
           </div>
         </motion.div>
       </div>
+    </div>
+  );
+}
+
+
+
+function WatchSourcesEditor({ sources, onChange }: {
+  sources: MediaSource[];
+  onChange: (sources: MediaSource[]) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const groups = useMemo(() => {
+    const map = new Map<string, MediaSource[]>();
+    for (const s of sources) {
+      const key = s.server || '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(s);
+    }
+    const keys = Array.from(map.keys());
+    const serverKeys = keys
+      .filter((k) => /^Server\s+\d+$/i.test(k))
+      .sort((a, b) => {
+        const na = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+        const nb = parseInt(b.match(/\d+/)?.[0] || '0', 10);
+        return na - nb;
+      });
+    const otherKeys = keys.filter((k) => !/^Server\s+\d+$/i.test(k));
+    return [...serverKeys, ...otherKeys].map((name) => ({
+      name,
+      display: name || 'Default',
+      items: map.get(name)!,
+    }));
+  }, [sources]);
+
+  const updateGroups = (next: { name: string; items: MediaSource[] }[]) =>
+    onChange(next.flatMap((g) => g.items.map((s) => ({ ...s, server: g.name || undefined }))));
+
+  const nextServerName = () => {
+    let max = 0;
+    for (const g of groups) {
+      const m = g.name.match(/^Server\s+(\d+)$/i);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+    return `Server ${max + 1}`;
+  };
+
+  const addServer = () =>
+    updateGroups([...groups, { name: nextServerName(), items: [{ server: undefined, label: '', url: '' }] }]);
+
+  const removeServer = (name: string) =>
+    updateGroups(groups.filter((g) => g.name !== name));
+
+  const renameServer = (oldName: string, newName: string) =>
+    updateGroups(groups.map((g) => (g.name === oldName ? { ...g, name: newName } : g)));
+
+  const addQuality = (name: string) =>
+    updateGroups(groups.map((g) => (g.name === name ? { ...g, items: [...g.items, { server: undefined, label: '', url: '' }] } : g)));
+
+  const updateQuality = (name: string, i: number, field: 'label' | 'url', value: string) =>
+    updateGroups(groups.map((g) => (g.name === name
+      ? { ...g, items: g.items.map((s, j) => (j === i ? { ...s, [field]: value } : s)) }
+      : g)));
+
+  const removeQuality = (name: string, i: number) =>
+    updateGroups(groups.map((g) => (g.name === name
+      ? { ...g, items: g.items.filter((_, j) => j !== i) }
+      : g)));
+
+  const handleUpload = async (file: File) => {
+    if (!file) return;
+    setUploading(true);
+    setProgress(0);
+    try {
+      const { data } = await mixdropApi.upload(file, setProgress);
+      const url = data.data.embedurl;
+      if (groups.length === 0) {
+        updateGroups([{ name: 'Server 1', items: [{ server: undefined, label: 'UPLOADED', url }] }]);
+      } else {
+        updateGroups(groups.map((g, i) => (i === 0 ? { ...g, items: [...g.items, { server: undefined, label: 'UPLOADED', url }] } : g)));
+      }
+      toast.success('Video uploaded — added to watch sources');
+    } catch (e: any) {
+      toast.error(e.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const toggle = (name: string) => setCollapsed((c) => ({ ...c, [name]: !c[name] }));
+
+  return (
+    <div>
+      <FieldLabel icon={UploadCloud}>Watch Sources (server · quality)</FieldLabel>
+
+      <div className="space-y-2 mb-2.5">
+        {groups.map((group) => {
+          const isOpen = !collapsed[group.name];
+          return (
+            <motion.div
+              key={group.name}
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-lg border border-dark-700 bg-dark-800/60"
+            >
+              {/* server header */}
+              <div className="flex items-center gap-2 p-2.5">
+                <button
+                  type="button"
+                  onClick={() => toggle(group.name)}
+                  className="p-1 rounded-md text-dark-500 hover:text-white hover:bg-white/5 transition-colors shrink-0"
+                >
+                  {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+                <ServerIcon className="h-4 w-4 text-sky-400 shrink-0" />
+                <input
+                  type="text"
+                  value={group.display}
+                  onChange={(e) => renameServer(group.name, e.target.value)}
+                  placeholder="Server name"
+                  className="w-40 shrink-0 rounded-md border border-dark-600 bg-dark-800 px-2.5 py-2 text-xs font-semibold text-sky-300 placeholder:text-dark-500 focus:outline-none focus:border-primary-500/60"
+                />
+                <span className="shrink-0 rounded-md bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-dark-400">
+                  {group.items.length} quality
+                </span>
+                <button
+                  type="button"
+                  onClick={() => addQuality(group.name)}
+                  className="ml-auto flex items-center gap-1 rounded-md border border-dark-600 px-2 py-1.5 text-xs font-medium text-dark-200 hover:border-primary-500/50 hover:text-white transition-all shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Quality
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeServer(group.name)}
+                  className="p-2 rounded-md text-dark-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* quality rows */}
+              <AnimatePresence initial={false}>
+                {isOpen && group.items.length > 0 && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                    className="overflow-hidden"
+                  >
+                    <div className="space-y-2 px-2.5 pb-2.5">
+                      {group.items.map((src, i) => (
+                        <div key={i} className="flex items-center gap-2 rounded-md border border-dark-700 bg-dark-900/50 p-2">
+                          <input
+                            type="text"
+                            value={src.label}
+                            onChange={(e) => updateQuality(group.name, i, 'label', e.target.value)}
+                            placeholder="Quality (e.g. HD)"
+                            className="w-24 shrink-0 rounded-md border border-dark-600 bg-dark-800 px-2.5 py-2 text-xs font-semibold text-primary-300 placeholder:text-dark-500 focus:outline-none focus:border-primary-500/60"
+                          />
+                          <input
+                            type="text"
+                            value={src.url}
+                            onChange={(e) => updateQuality(group.name, i, 'url', e.target.value)}
+                            placeholder="https://... or <iframe ...> embed code"
+                            className="w-full rounded-md border border-dark-600 bg-dark-800 px-3 py-2 text-sm text-dark-50 placeholder:text-dark-500 focus:outline-none focus:border-primary-500/60 focus:ring-1 focus:ring-primary-500/20 transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeQuality(group.name, i)}
+                            className="p-2 rounded-md text-dark-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={addServer}
+          className="flex items-center gap-1.5 rounded-md border border-dark-600 bg-dark-800 px-3 py-2 text-xs font-medium text-dark-200 hover:border-primary-500/50 hover:text-white transition-all"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add Server
+        </button>
+
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-1.5 rounded-md bg-primary-600 px-3 py-2 text-xs font-semibold text-white hover:bg-primary-500 disabled:opacity-60 transition-all shadow-lg shadow-primary-600/25"
+        >
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />}
+          Upload video
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="video/*,.mkv,.avi,.mov"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) handleUpload(f);
+            e.target.value = '';
+          }}
+        />
+      </div>
+
+      {uploading && (
+        <div className="mt-2.5 space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-white/70">
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary-400" />
+              Uploading to Mixdrop...
+            </span>
+            <span className="font-mono text-primary-300">{progress}%</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+            <motion.div
+              className="h-full rounded-full bg-gradient-to-r from-primary-600 to-sky-500"
+              animate={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

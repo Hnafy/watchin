@@ -4,13 +4,23 @@ import { slugify, ensureGenre, ensureCountry, ensureLanguage } from '../db/utils
 import { AppError } from '../utils/AppError.js';
 
 const tmdbFetch = async (path: string, params: Record<string, string> = {}): Promise<any> => {
+  if (!config.tmdb.apiKey) {
+    throw AppError.badRequest(
+      'TMDB API key is not configured. Add TMDB_API_KEY to server/.env and restart the server.',
+    );
+  }
   const url = new URL(`${config.tmdb.baseUrl}${path}`);
   url.searchParams.set('language', 'en-US');
   url.searchParams.set('api_key', config.tmdb.apiKey!);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   const res = await fetch(url.toString());
-  if (!res.ok) throw AppError.badRequest(`TMDB API error: ${res.statusText}`);
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw AppError.badRequest('Invalid TMDB API key. Check TMDB_API_KEY in server/.env');
+    }
+    throw AppError.badRequest(`TMDB API error: ${res.statusText}`);
+  }
   return res.json();
 };
 
@@ -58,6 +68,36 @@ export const tmdbService = {
       append_to_response: 'credits,external_ids,videos,keywords',
     });
     return data;
+  },
+
+  async getImages(tmdbId: number, type: string) {
+    const endpoint = type === 'TV_SHOW' ? 'tv' : 'movie';
+    const [imgData, videoData] = await Promise.all([
+      tmdbFetch(`/${endpoint}/${tmdbId}/images`),
+      tmdbFetch(`/${endpoint}/${tmdbId}/videos`),
+    ]);
+    const backdrops = (imgData.backdrops || []).slice(0, 10).map((b: any) => ({
+      type: 'backdrop',
+      url: `${config.tmdb.imageBaseUrl}/w1280${b.file_path}`,
+      aspectRatio: b.aspect_ratio || 1.78,
+    }));
+    const posters = (imgData.posters || []).slice(0, 6).map((p: any) => ({
+      type: 'poster',
+      url: `${config.tmdb.imageBaseUrl}/w500${p.file_path}`,
+      aspectRatio: p.aspect_ratio || 0.667,
+    }));
+    const videos = (videoData.results || [])
+      .filter((v: any) => v.site === 'YouTube')
+      .slice(0, 8)
+      .map((v: any) => ({
+        type: 'video',
+        url: `https://www.youtube.com/watch?v=${v.key}`,
+        embedUrl: `https://www.youtube.com/embed/${v.key}`,
+        thumbnailUrl: `https://img.youtube.com/vi/${v.key}/hqdefault.jpg`,
+        name: v.name || 'Video',
+        videoType: v.type || 'Video',
+      }));
+    return { backdrops, posters, videos };
   },
 
   async import(tmdbId: number, type: string) {

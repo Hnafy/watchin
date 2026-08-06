@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useRef } from "react";
+import { createPortal } from "react-dom";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   motion,
@@ -7,7 +8,7 @@ import {
   useScroll,
   useTransform,
 } from "framer-motion";
-import { mediaApi } from "../services/api";
+import { mediaApi, tmdbApi } from "../services/api";
 import { Media } from "../types";
 import {
   Play,
@@ -26,8 +27,10 @@ import {
   UserCircle,
   ChevronLeft,
   ChevronRight,
+  Images,
 } from "lucide-react";
 import { formatRuntime, formatNumber } from "../utils/formatters";
+import { getEmbedInfo, withAutoplay } from "../utils/embeds";
 import { StarRating } from "../components/ui/StarRating";
 import { Chip } from "../components/ui/Chip";
 import { EpisodeSelector } from "../components/media/EpisodeSelector";
@@ -43,10 +46,161 @@ import {
   useSimilarMedia,
 } from "../hooks/useMedia";
 import { useAuth } from "../hooks/useAuth";
-import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 
 const ease = [0.16, 1, 0.3, 1] as const;
+
+interface GalleryItem {
+  kind: "backdrop" | "poster" | "video";
+  url: string;
+  embedUrl?: string;
+  label: string;
+}
+
+function useHorizontalScroll(selector: string, fallbackWidth: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(true);
+
+  const check = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 8);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8);
+  }, []);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    el.addEventListener("scroll", check, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", check);
+    };
+  }, [check]);
+
+  const scrollBy = (dir: "left" | "right") => {
+    const el = ref.current;
+    if (!el) return;
+    const amount = (el.querySelector<HTMLElement>(selector)?.offsetWidth || fallbackWidth) + 16;
+    el.scrollBy({ left: dir === "left" ? -amount : amount, behavior: "smooth" });
+  };
+
+  return { ref, canLeft, canRight, scrollBy };
+}
+
+function GalleryLightbox({
+  items,
+  index,
+  onClose,
+  onNavigate,
+}: {
+  items: GalleryItem[];
+  index: number;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
+}) {
+  const total = items.length;
+  const item = items[index];
+  const prev = (index - 1 + total) % total;
+  const next = (index + 1) % total;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft") onNavigate(prev);
+      if (e.key === "ArrowRight") onNavigate(next);
+    };
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose, onNavigate, prev, next]);
+
+  if (!item) return null;
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 px-4 backdrop-blur-xl"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        aria-label="Close gallery"
+        className="absolute right-5 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onNavigate(prev);
+        }}
+        aria-label="Previous"
+        className="absolute left-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10 sm:left-5"
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onNavigate(next);
+        }}
+        aria-label="Next"
+        className="absolute right-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10 sm:right-5"
+      >
+        <ChevronRight className="h-6 w-6" />
+      </button>
+      <motion.div
+        key={index}
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.25, ease }}
+        className="relative flex w-full max-w-5xl flex-col items-center"
+      >
+        {item.kind === "video" ? (
+          <div className="aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_40px_120px_rgba(0,0,0,0.8)]">
+            <iframe
+              src={withAutoplay(item.embedUrl!, true)}
+              title={item.label}
+              className="h-full w-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        ) : (
+          <img
+            src={item.url}
+            alt={item.label}
+            className="max-h-[82vh] w-auto max-w-full rounded-2xl border border-white/10 object-contain shadow-[0_40px_120px_rgba(0,0,0,0.8)]"
+          />
+        )}
+        <div className="mt-4 flex w-full items-center justify-between gap-4">
+          <p className="truncate text-sm font-semibold text-white">{item.label}</p>
+          <p className="shrink-0 text-sm text-dark-400">
+            {index + 1} / {total}
+          </p>
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body,
+  );
+}
 
 function getYouTubeId(url: string): string | null {
   const m = url.match(
@@ -90,38 +244,44 @@ function PersonAvatar({
 
 function TrailerModal({ url, onClose }: { url: string; onClose: () => void }) {
   const ytId = getYouTubeId(url);
+  const embed = getEmbedInfo(url);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handler);
+      document.body.style.overflow = "";
+    };
   }, [onClose]);
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
     >
       <div
         className="absolute inset-0 bg-black/85 backdrop-blur-xl"
         onClick={onClose}
       />
+      <button
+        onClick={onClose}
+        aria-label="Close trailer"
+        className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10"
+      >
+        <X className="h-5 w-5" />
+      </button>
       <motion.div
         initial={{ scale: 0.92, y: 20 }}
         animate={{ scale: 1, y: 0 }}
         exit={{ scale: 0.92, y: 20 }}
         transition={{ type: "spring", stiffness: 260, damping: 26 }}
-        className="relative w-full max-w-4xl aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_40px_120px_rgba(0,0,0,0.8)]"
+        className="relative w-full max-w-5xl aspect-video overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_40px_120px_rgba(0,0,0,0.8)]"
       >
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 z-10 rounded-full bg-black/60 p-2 text-white backdrop-blur hover:bg-black/80 transition-colors"
-        >
-          <X className="h-5 w-5" />
-        </button>
         {ytId ? (
           <iframe
             src={`https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0`}
@@ -129,11 +289,22 @@ function TrailerModal({ url, onClose }: { url: string; onClose: () => void }) {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
+        ) : embed ? (
+          <iframe
+            src={withAutoplay(embed.src, true)}
+            className="h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            scrolling="no"
+            frameBorder={0}
+            referrerPolicy="origin"
+          />
         ) : (
           <video src={url} controls autoPlay className="h-full w-full" />
         )}
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body,
   );
 }
 
@@ -177,13 +348,78 @@ export function MediaDetail() {
   // Backdrop parallax
   const heroRef = useRef<HTMLDivElement>(null);
   const castRef = useRef<HTMLDivElement>(null);
+  const [canScrollCastLeft, setCanScrollCastLeft] = useState(false);
+  const [canScrollCastRight, setCanScrollCastRight] = useState(true);
+
+  const checkCastScroll = useCallback(() => {
+    const el = castRef.current;
+    if (!el) return;
+    setCanScrollCastLeft(el.scrollLeft > 8);
+    setCanScrollCastRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8);
+  }, []);
+
+  useEffect(() => {
+    const el = castRef.current;
+    if (!el) return;
+    checkCastScroll();
+    const ro = new ResizeObserver(checkCastScroll);
+    ro.observe(el);
+    el.addEventListener("scroll", checkCastScroll, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", checkCastScroll);
+    };
+  }, [checkCastScroll]);
 
   const scrollCast = (dir: 'left' | 'right') => {
     const el = castRef.current;
     if (!el) return;
-    const amount = 180;
+    const amount = (el.querySelector<HTMLElement>('[data-cast-card]')?.offsetWidth || 80) + 16;
     el.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'smooth' });
   };
+
+  // Photos & Videos gallery
+  const photosScroll = useHorizontalScroll("[data-photo-card]", 288);
+  const videosScroll = useHorizontalScroll("[data-video-card]", 288);
+  const [photos, setPhotos] = useState<GalleryItem[]>([]);
+  const [videos, setVideos] = useState<GalleryItem[]>([]);
+  const [galleryOpen, setGalleryOpen] = useState<{ items: GalleryItem[]; index: number } | null>(null);
+
+  useEffect(() => {
+    const tmdbId = media?.tmdbId;
+    if (!tmdbId) return;
+    let cancelled = false;
+    tmdbApi
+      .getImages(tmdbId, media.type)
+      .then((res) => {
+        if (cancelled) return;
+        const data = res.data?.data;
+        setPhotos([
+          ...(data?.backdrops || []).map((b: any, i: number) => ({
+            kind: 'backdrop' as const,
+            url: b.url,
+            label: `Backdrop ${i + 1}`,
+          })),
+          ...(data?.posters || []).map((p: any, i: number) => ({
+            kind: 'poster' as const,
+            url: p.url,
+            label: `Poster ${i + 1}`,
+          })),
+        ]);
+        setVideos(
+          (data?.videos || []).map((v: any) => ({
+            kind: 'video' as const,
+            url: v.thumbnailUrl || v.embedUrl,
+            embedUrl: v.embedUrl,
+            label: v.name,
+          })),
+        );
+      })
+      .catch(() => { /* hide gallery when TMDB unavailable */ });
+    return () => {
+      cancelled = true;
+    };
+  }, [media?.tmdbId, media?.type]);
   const { scrollYProgress } = useScroll({
     target: heroRef,
     offset: ["start start", "end start"],
@@ -275,14 +511,14 @@ export function MediaDetail() {
         />
         <div className="absolute inset-0 bg-gradient-to-r from-dark-950/90 via-dark-950/30 to-transparent" />
 
-        <div className="relative mx-auto max-w-7xl px-6 pb-10 pt-28 sm:px-10 sm:pt-32 lg:px-14">
+        <div className="relative mx-auto max-w-7xl px-6 pb-10 pt-4 sm:px-10 sm:pt-6 lg:px-14">
           <motion.button
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             onClick={() => navigate(-1)}
-            className="mb-6 flex items-center gap-2 text-white/60 transition-colors hover:text-white"
+            className="group mb-6 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-xl transition-all hover:-translate-x-0.5 hover:border-white/25 hover:bg-white/10 hover:text-white"
           >
-            <ArrowLeft className="h-4 w-4" /> Back
+            <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5" /> Back
           </motion.button>
 
           <div className="grid gap-10 lg:grid-cols-[300px_1fr]">
@@ -294,17 +530,31 @@ export function MediaDetail() {
               className="hidden lg:block"
             >
               {media.posterUrl ? (
-                <div className="relative">
-                  <div className="absolute -inset-4 rounded-3xl bg-primary-600/15 blur-3xl" />
-                  <div className="relative rounded-2xl border border-white/[0.1] bg-dark-900/70 p-1.5 shadow-card">
+                <motion.div
+                  className="relative"
+                  whileHover={{ scale: 1.02 }}
+                  transition={{ duration: 0.3, ease }}
+                >
+                  <div className="absolute -inset-5 rounded-[28px] bg-gradient-to-br from-primary-600/25 via-purple-500/10 to-sky-500/25 blur-3xl" />
+                  <div className="relative overflow-hidden rounded-2xl bg-dark-900 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)]">
                     <img
                       src={media.posterUrl}
                       alt={media.title}
-                      className="w-full max-w-[300px] aspect-[2/3] rounded-xl object-cover"
+                      className="w-full aspect-[2/3] object-cover"
                     />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-white/10" />
                   </div>
-                </div>
-              ) : null}
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.6, ease }}
+                  className="flex aspect-[2/3] w-full max-w-[300px] items-center justify-center rounded-2xl border border-white/[0.08] bg-gradient-to-br from-dark-800 to-dark-900 shadow-card"
+                >
+                  <Film className="h-12 w-12 text-dark-500" />
+                </motion.div>
+              )}
             </motion.div>
 
             {/* Info */}
@@ -659,9 +909,9 @@ export function MediaDetail() {
                   </div>
                 )}
               </motion.div>
-            </div>
           </div>
         </div>
+      </div>
       </div>
 
 <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-14">
@@ -722,45 +972,6 @@ export function MediaDetail() {
               )}
             </motion.section>
 
-            {/* Directors */}
-            {media.directors && media.directors.length > 0 && (
-              <motion.section
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35 }}
-                className="py-8"
-              >
-                <h2 className="mb-5 text-xl font-bold tracking-tight">
-                  {media.directors.length > 1 ? "Directors" : "Director"}
-                </h2>
-                <div className="flex flex-wrap gap-4">
-                  {media.directors.map((d, i) => (
-                    <motion.div
-                      key={d.id}
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 + i * 0.05 }}
-                      whileHover={{ y: -4 }}
-                      className="flex min-w-[200px] items-center gap-3 rounded-2xl border border-white/[0.08] bg-dark-900/70 px-4 py-3 shadow-card transition-colors hover:border-white/[0.16]"
-                    >
-                      <PersonAvatar
-                        src={d.person.profilePath}
-                        name={d.person.name}
-                        ringClass="ring-2 ring-primary-500/30"
-                        className="h-11 w-11 text-base"
-                      />
-                      <div>
-                        <p className="text-sm font-semibold text-white">
-                          {d.person.name}
-                        </p>
-                        <p className="text-xs text-dark-400">Director</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </motion.section>
-            )}
-
             {/* Episodes */}
             {media.type === "TV_SHOW" && media.seasons?.length > 0 && (
               <motion.section
@@ -769,9 +980,20 @@ export function MediaDetail() {
                 transition={{ delay: 0.4 }}
                 className="py-8"
               >
-                <h2 className="mb-5 text-xl font-bold tracking-tight">
-                  Episodes
-                </h2>
+                <div className="mb-5 flex items-center gap-3">
+                  <motion.span
+                    initial={{ scaleY: 0, opacity: 0 }}
+                    whileInView={{ scaleY: 1, opacity: 1 }}
+                    viewport={{ once: true, margin: '-60px' }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    style={{ originY: 0 }}
+                    className="h-5 w-1 shrink-0 rounded-full bg-gradient-to-b from-primary-400 to-primary-600"
+                    aria-hidden="true"
+                  />
+                  <h2 className="text-lg font-bold uppercase tracking-widest text-white">
+                    Episodes
+                  </h2>
+                </div>
                 <EpisodeSelector
                   seasons={media.seasons}
                   mediaId={media.id}
@@ -784,69 +1006,272 @@ export function MediaDetail() {
               </motion.section>
             )}
 
-            {/* Cast */}
-            {media.cast?.length > 0 && (
-              <div className="py-8">
-                <h3 className="mb-4 text-sm font-bold uppercase tracking-widest text-dark-300">Cast</h3>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => scrollCast('left')}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-dark-900/80 text-white/50 hover:bg-dark-800/90 hover:text-white transition-colors"
-                    aria-label="Scroll cast left"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => scrollCast('right')}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-dark-900/80 text-white/50 hover:bg-dark-800/90 hover:text-white transition-colors"
-                    aria-label="Scroll cast right"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                  <div
-                    ref={castRef}
-                    className="flex gap-4 overflow-x-auto scrollbar-hide pb-3"
-                  >
-                    {media.cast.slice(0, 20).map((c) => (
-                      <div
-                        key={c.id}
-                        className="flex flex-col items-center text-center shrink-0 w-20 group cursor-pointer"
-                      >
-                        <div className="relative mb-3 h-18 w-18 overflow-hidden rounded-full border border-white/[0.08] shadow-soft transition-all duration-300 group-hover:border-white/[0.16] group-hover:shadow-glow-red">
-                          <PersonAvatar
-                            src={c.person.profilePath}
-                            name={c.person.name}
-                            ringClass="ring-2 ring-dark-700"
-                            className="h-18 w-18 text-sm"
-                          />
-                        </div>
-                        <p
-                          className="text-[11px] font-semibold text-white line-clamp-1 w-full transition-colors group-hover:text-primary-400"
-                          title={c.person.name}
-                        >
-                          {c.person.name}
-                        </p>
-                        {c.character && (
-                          <p
-                            className="mt-0.5 truncate text-[9px] text-dark-400 line-clamp-1 w-full transition-colors group-hover:text-dark-200"
-                            title={c.character}
-                          >
-                            as {c.character}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+            {/* Cast & Crew */}
+            {((media.cast?.length || 0) > 0 || (media.directors?.length || 0) > 0) && (
+              <section className="py-8">
+                <div className="group/team mb-5 flex items-end justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <motion.span
+                    initial={{ scaleY: 0, opacity: 0 }}
+                    whileInView={{ scaleY: 1, opacity: 1 }}
+                    viewport={{ once: true, margin: '-60px' }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    style={{ originY: 0 }}
+                    className="h-5 w-1 shrink-0 rounded-full bg-gradient-to-b from-primary-400 to-primary-600"
+                    aria-hidden="true"
+                  />
+                    <h2 className="text-lg font-bold uppercase tracking-widest text-white">Cast &amp; Crew</h2>
                   </div>
-                  <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-dark-950 via-dark-950/80 to-transparent pointer-events-none" />
+                  <div className="flex items-center gap-2 opacity-0 transition-opacity duration-300 group-hover/team:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => scrollCast("left")}
+                      aria-label="Scroll left"
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10 ${canScrollCastLeft ? "" : "opacity-40 pointer-events-none"}`}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollCast("right")}
+                      aria-label="Scroll right"
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10 ${canScrollCastRight ? "" : "opacity-40 pointer-events-none"}`}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
+                <div className="rounded-2xl border border-white/[0.08] bg-dark-900/70 p-5 shadow-card">
+                  <div className="relative">
+                    <div
+                      ref={castRef}
+                      className="flex gap-4 overflow-x-auto scrollbar-hide px-1 pb-2"
+                    >
+                      {(media.directors || []).map((d) => (
+                        <div
+                          key={d.id}
+                          data-cast-card
+                          className="group flex w-20 shrink-0 cursor-pointer flex-col items-center text-center"
+                        >
+                          <div className="relative mb-3 h-20 w-20 overflow-hidden rounded-full border border-primary-500/30 shadow-soft group-hover:border-primary-500/60">
+                            <PersonAvatar
+                              src={d.person.profilePath}
+                              name={d.person.name}
+                              ringClass="ring-2 ring-primary-500/30"
+                              className="h-20 w-20 text-lg"
+                            />
+                          </div>
+                          <p
+                            className="w-full truncate text-[11px] font-semibold text-white line-clamp-1 transition-colors group-hover:text-primary-400"
+                            title={d.person.name}
+                          >
+                            {d.person.name}
+                          </p>
+                          <p className="mt-0.5 w-full truncate text-[9px] text-primary-300/90">
+                            Director
+                          </p>
+                        </div>
+                      ))}
+                      {(media.cast || []).slice(0, 24).map((c) => (
+                        <div
+                          key={c.id}
+                          data-cast-card
+                          className="group flex w-20 shrink-0 cursor-pointer flex-col items-center text-center"
+                        >
+                          <div className="relative mb-3 h-20 w-20 overflow-hidden rounded-full border border-white/[0.08] shadow-soft group-hover:border-white/[0.16]">
+                            <PersonAvatar
+                              src={c.person.profilePath}
+                              name={c.person.name}
+                              ringClass="ring-2 ring-dark-700"
+                              className="h-20 w-20 text-lg"
+                            />
+                          </div>
+                          <p
+                            className="w-full truncate text-[11px] font-semibold text-white line-clamp-1 transition-colors group-hover:text-primary-400"
+                            title={c.person.name}
+                          >
+                            {c.person.name}
+                          </p>
+                          {c.character && (
+                            <p
+                              className="mt-0.5 w-full truncate text-[9px] text-dark-400 line-clamp-1 transition-colors group-hover:text-dark-200"
+                              title={c.character}
+                            >
+                              as {c.character}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div
+                      className={`pointer-events-none absolute right-0 top-0 bottom-2 w-12 bg-gradient-to-l from-dark-900 via-dark-900/80 to-transparent transition-opacity duration-300 ${canScrollCastRight ? "opacity-100" : "opacity-0"}`}
+                    />
+                    <div
+                      className={`pointer-events-none absolute left-0 top-0 bottom-2 w-12 bg-gradient-to-r from-dark-900 via-dark-900/80 to-transparent transition-opacity duration-300 ${canScrollCastLeft ? "opacity-100" : "opacity-0"}`}
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Photos */}
+            {photos.length > 0 && (
+              <section className="py-8">
+                <div className="group/photos mb-5 flex items-end justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <motion.span
+                    initial={{ scaleY: 0, opacity: 0 }}
+                    whileInView={{ scaleY: 1, opacity: 1 }}
+                    viewport={{ once: true, margin: '-60px' }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    style={{ originY: 0 }}
+                    className="h-5 w-1 shrink-0 rounded-full bg-gradient-to-b from-primary-400 to-primary-600"
+                    aria-hidden="true"
+                  />
+                    <h2 className="text-lg font-bold uppercase tracking-widest text-white">Photos</h2>
+                  </div>
+                  <div className="flex items-center gap-2 opacity-0 transition-opacity duration-300 group-hover/photos:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => photosScroll.scrollBy("left")}
+                      aria-label="Scroll photos left"
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10 ${photosScroll.canLeft ? "" : "opacity-40 pointer-events-none"}`}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => photosScroll.scrollBy("right")}
+                      aria-label="Scroll photos right"
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10 ${photosScroll.canRight ? "" : "opacity-40 pointer-events-none"}`}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/[0.08] bg-dark-900/70 p-5 shadow-card">
+                  <div className="relative">
+                    <div
+                      ref={photosScroll.ref}
+                      className="flex gap-4 overflow-x-auto scrollbar-hide px-1 pb-2"
+                    >
+                      {photos.map((p, i) => (
+                        <button
+                          key={p.url}
+                          type="button"
+                          data-photo-card
+                          onClick={() => setGalleryOpen({ items: photos, index: i })}
+                          className={`group relative shrink-0 cursor-pointer overflow-hidden rounded-xl border border-white/[0.06] bg-dark-800 shadow-soft hover:border-white/[0.16] ${
+                            p.kind === "poster" ? "w-36" : "w-72"
+                          }`}
+                        >
+                          <img
+                            src={p.url}
+                            alt={p.label}
+                            loading="lazy"
+                            className={`w-full object-cover ${
+                              p.kind === "poster" ? "aspect-[2/3]" : "aspect-video"
+                            }`}
+                          />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                          <div className="absolute inset-x-0 bottom-0 translate-y-2 p-2 text-left opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                            <p className="truncate text-[10px] font-semibold text-white">{p.label}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div
+                      className={`pointer-events-none absolute right-0 top-0 bottom-2 w-12 bg-gradient-to-l from-dark-900 via-dark-900/80 to-transparent transition-opacity duration-300 ${photosScroll.canRight ? "opacity-100" : "opacity-0"}`}
+                    />
+                    <div
+                      className={`pointer-events-none absolute left-0 top-0 bottom-2 w-12 bg-gradient-to-r from-dark-900 via-dark-900/80 to-transparent transition-opacity duration-300 ${photosScroll.canLeft ? "opacity-100" : "opacity-0"}`}
+                    />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Videos */}
+            {videos.length > 0 && (
+              <section className="py-8">
+                <div className="group/videos mb-5 flex items-end justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <motion.span
+                    initial={{ scaleY: 0, opacity: 0 }}
+                    whileInView={{ scaleY: 1, opacity: 1 }}
+                    viewport={{ once: true, margin: '-60px' }}
+                    transition={{ duration: 0.6, ease: 'easeOut' }}
+                    style={{ originY: 0 }}
+                    className="h-5 w-1 shrink-0 rounded-full bg-gradient-to-b from-primary-400 to-primary-600"
+                    aria-hidden="true"
+                  />
+                    <h2 className="text-lg font-bold uppercase tracking-widest text-white">Videos</h2>
+                  </div>
+                  <div className="flex items-center gap-2 opacity-0 transition-opacity duration-300 group-hover/videos:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => videosScroll.scrollBy("left")}
+                      aria-label="Scroll videos left"
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10 ${videosScroll.canLeft ? "" : "opacity-40 pointer-events-none"}`}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => videosScroll.scrollBy("right")}
+                      aria-label="Scroll videos right"
+                      className={`flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white transition-all hover:border-white/30 hover:bg-white/10 ${videosScroll.canRight ? "" : "opacity-40 pointer-events-none"}`}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-white/[0.08] bg-dark-900/70 p-5 shadow-card">
+                  <div className="relative">
+                    <div
+                      ref={videosScroll.ref}
+                      className="flex gap-4 overflow-x-auto scrollbar-hide px-1 pb-2"
+                    >
+                      {videos.map((v, i) => (
+                        <button
+                          key={v.url}
+                          type="button"
+                          data-video-card
+                          onClick={() => setGalleryOpen({ items: videos, index: i })}
+                          className="group relative w-72 shrink-0 cursor-pointer overflow-hidden rounded-xl border border-white/[0.06] bg-dark-800 shadow-soft hover:border-white/[0.16]"
+                        >
+                          <img
+                            src={v.url}
+                            alt={v.label}
+                            loading="lazy"
+                            className="aspect-video w-full object-cover"
+                          />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-600/90 shadow-glow-red">
+                              <Play className="h-4 w-4 fill-white text-white" />
+                            </span>
+                          </div>
+                          <div className="absolute inset-x-0 bottom-0 translate-y-2 p-2 text-left opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                            <p className="truncate text-[10px] font-semibold text-white">{v.label}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div
+                      className={`pointer-events-none absolute right-0 top-0 bottom-2 w-12 bg-gradient-to-l from-dark-900 via-dark-900/80 to-transparent transition-opacity duration-300 ${videosScroll.canRight ? "opacity-100" : "opacity-0"}`}
+                    />
+                    <div
+                      className={`pointer-events-none absolute left-0 top-0 bottom-2 w-12 bg-gradient-to-r from-dark-900 via-dark-900/80 to-transparent transition-opacity duration-300 ${videosScroll.canLeft ? "opacity-100" : "opacity-0"}`}
+                    />
+                  </div>
+                </div>
+              </section>
             )}
           </div>
 
           {/* Sidebar */}
-          <div className="hidden lg:block">
+          <div className="mt-40 mb-10 hidden lg:block">
             <div className="sticky top-28 space-y-6">
               {media.keywords && media.keywords.length > 0 && (
                 <div className="rounded-2xl border border-white/[0.08] bg-dark-900/70 p-5 shadow-card">
@@ -874,7 +1299,6 @@ export function MediaDetail() {
         <div className="pt-6">
           <MediaCarousel
             title="More Like This"
-            eyebrow="Because you like this title"
             icon={<Sparkles className="h-4 w-4" />}
             items={similarItems.slice(0, 20)}
             reasons={similarReasons}
@@ -907,6 +1331,20 @@ export function MediaDetail() {
           <TrailerModal
             url={trailerUrl}
             onClose={() => setShowTrailer(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Gallery lightbox */}
+      <AnimatePresence>
+        {galleryOpen && (
+          <GalleryLightbox
+            items={galleryOpen.items}
+            index={galleryOpen.index}
+            onClose={() => setGalleryOpen(null)}
+            onNavigate={(i) =>
+              setGalleryOpen((prev) => (prev ? { ...prev, index: i } : prev))
+            }
           />
         )}
       </AnimatePresence>

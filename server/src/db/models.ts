@@ -21,6 +21,31 @@ const baseOptions = {
 // ---------------------------------------------------------------------------
 // User
 // ---------------------------------------------------------------------------
+const UserSettingsSchema = new Schema(
+  {
+    notifications: {
+      emailUpdates: { type: Boolean, default: false },
+      newReleases: { type: Boolean, default: true },
+      watchlist: { type: Boolean, default: true },
+      comments: { type: Boolean, default: true },
+    },
+    privacy: {
+      publicProfile: { type: Boolean, default: true },
+      showWatchHistory: { type: Boolean, default: true },
+      showStats: { type: Boolean, default: true },
+    },
+    playback: {
+      autoplay: { type: Boolean, default: true },
+      resume: { type: Boolean, default: true },
+      defaultQuality: { type: String, default: 'auto' },
+    },
+    appearance: {
+      reduceMotion: { type: Boolean, default: false },
+    },
+  },
+  { _id: false }
+);
+
 const UserSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, index: true },
@@ -35,6 +60,7 @@ const UserSchema = new Schema(
     },
     emailVerified: { type: Boolean, default: true },
     lastLoginAt: { type: Date, default: null },
+    settings: { type: UserSettingsSchema, default: () => ({}) },
   },
   { ...baseOptions, timestamps: true, collection: 'users' }
 );
@@ -76,6 +102,16 @@ const MediaSchema = new Schema(
     logoUrl: { type: String, default: null },
     trailerUrl: { type: String, default: null },
     watchUrl: { type: String, default: null },
+    sources: {
+      type: [
+        {
+          server: { type: String, default: null },
+          label: { type: String, default: null },
+          url: { type: String, required: true },
+        },
+      ],
+      default: [],
+    },
     releaseDate: { type: Date, default: null },
     firstAirDate: { type: Date, default: null },
     lastAirDate: { type: Date, default: null },
@@ -257,6 +293,16 @@ const EpisodeSchema = new Schema(
     airDate: { type: Date, default: null },
     runtime: { type: Number, default: null },
     watchUrl: { type: String, default: null },
+    sources: {
+      type: [
+        {
+          server: { type: String, default: null },
+          label: { type: String, default: null },
+          url: { type: String, required: true },
+        },
+      ],
+      default: [],
+    },
   },
   { ...baseOptions, collection: 'episodes' }
 );
@@ -384,6 +430,7 @@ const AdminMediaInputSchema = new Schema(
     logoUrl: { type: String, default: null },
     trailerUrl: { type: String, default: null },
     watchUrl: { type: String, default: null },
+    sources: { type: Schema.Types.Mixed, default: [] },
     quality: { type: String, default: null },
     imdbRating: { type: Number, default: null },
     genres: [{ type: String }],
@@ -500,3 +547,30 @@ const SiteSettingSchema = new Schema(
   { ...baseOptions, timestamps: true, collection: 'sitesettings' }
 );
 export const SiteSetting = model('SiteSetting', SiteSettingSchema);
+
+// ---------------------------------------------------------------------------
+// Comment
+// ---------------------------------------------------------------------------
+const CommentSchema = new Schema(
+  {
+    mediaId: { type: Schema.Types.ObjectId, ref: 'Media', required: true, index: true },
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    parentId: { type: Schema.Types.ObjectId, ref: 'Comment', default: null, index: true },
+    content: { type: String, required: true, maxlength: 2000 },
+  },
+  { ...baseOptions, timestamps: true, collection: 'comments' }
+);
+CommentSchema.index({ mediaId: 1, parentId: 1, createdAt: -1 });
+CommentSchema.virtual('user', {
+  ref: 'User',
+  localField: 'userId',
+  foreignField: '_id',
+  justOne: true,
+  select: 'username avatar role',
+});
+CommentSchema.virtual('replies', {
+  ref: 'Comment',
+  localField: '_id',
+  foreignField: 'parentId',
+});
+export const Comment = model('Comment', CommentSchema);

@@ -72,7 +72,7 @@ export function Watchlist() {
   const items = (data?.data || []) as WatchlistItem[];
 
   return (
-    <div className="min-h-screen bg-dark-950">
+    <div className="min-h-screen">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-24 pb-16">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -145,7 +145,7 @@ export function Watchlist() {
                 transition={{ delay: i * 0.05 }}
                 className="relative group/card"
               >
-                <MediaCard media={item.media} index={i} onClick={() => navigate(`/media/${item.media.slug}`)} onPlay={() => handlePlay(item.media)} onAddToList={() => handleAddToList(item.media)} onLike={() => handleLike(item.media)} />
+                <MediaCard media={item.media} index={i} fill onClick={() => navigate(`/media/${item.media.slug}`)} onPlay={() => handlePlay(item.media)} onAddToList={() => handleAddToList(item.media)} onLike={() => handleLike(item.media)} />
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

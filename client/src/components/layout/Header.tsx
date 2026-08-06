@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Search, User, LogOut, Heart, LayoutDashboard, Settings, SlidersHorizontal, Film, Tv, Zap, Sparkles, ChevronDown } from 'lucide-react';
+import { Menu, X, Search, User, LogOut, Heart, LayoutDashboard, Settings, SlidersHorizontal, Film, Tv, Zap, Sparkles } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { FilterPopover } from '../search/FilterPopover';
 import { SearchFilters } from '../../types';
@@ -9,6 +9,10 @@ import { paramsToFilters, filtersToSearchParams } from '../../utils/filters';
 
 const NAV_LINKS = [
   { to: '/', label: 'Home' },
+  { to: '/movies', label: 'Movies' },
+  { to: '/tv-shows', label: 'TV Shows' },
+  { to: '/trending', label: 'Trending' },
+  { to: '/anime', label: 'Anime' },
   { to: '/about', label: 'About' },
 ];
 
@@ -41,9 +45,7 @@ export const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const categoriesRef = useRef<HTMLDivElement>(null);
 
   const isCategoryActive = (cat: { to: string }) => location.pathname === cat.to;
 
@@ -56,7 +58,6 @@ export const Header = () => {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
-      if (categoriesRef.current && !categoriesRef.current.contains(e.target as Node)) setCategoriesOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -95,7 +96,7 @@ export const Header = () => {
       initial={{ y: -80 }}
       animate={{ y: 0 }}
       transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-      className="fixed top-0 left-0 right-0 z-50 bg-dark-950 shadow-2xl shadow-black/50"
+      className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-dark-950/70 backdrop-blur-xl"
     >
       <nav className="mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center gap-3 transition-all duration-300 max-w-full" style={{ justifyContent: 'space-between' }}>
         {/* Logo */}
@@ -122,41 +123,6 @@ export const Header = () => {
               {link.label}
             </Link>
           ))}
-        </div>
-
-        {/* Categories dropdown */}
-        <div ref={categoriesRef} className="relative hidden lg:flex">
-          <button
-            onClick={() => setCategoriesOpen((s) => !s)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-white/60 hover:text-white hover:bg-white/5"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            <span className="hidden xl:inline">Categories</span>
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${categoriesOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          <AnimatePresence>
-            {categoriesOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="absolute left-0 mt-2 w-56 overflow-hidden rounded-2xl border border-white/[0.08] bg-dark-900 shadow-2xl shadow-black/60 py-1.5 z-50"
-              >
-                {CATEGORIES.map((cat) => (
-                  <Link
-                    key={cat.to}
-                    to={cat.to}
-                    onClick={() => setCategoriesOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${isCategoryActive(cat) ? 'bg-white/[0.06] font-semibold text-white' : 'text-dark-200 hover:bg-white/[0.04] hover:text-white'}`}
-                  >
-                    <cat.icon className="h-4 w-4" /> {cat.label}
-                  </Link>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
 
         {/* Spacer */}

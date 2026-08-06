@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { RotateCcw, Play } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getEmbedInfo, withAutoplay } from '../../utils/embeds';
 
 interface VideoPlayerProps {
   src: string;
@@ -26,7 +27,10 @@ function getYouTubeId(url: string): string | null {
   return null;
 }
 
-function getSourceType(url: string): 'youtube' | 'hls' | 'video' | 'unknown' {
+type SourceType = 'youtube' | 'hls' | 'video' | 'embed' | 'unknown';
+
+function getSourceType(url: string): SourceType {
+  if (getEmbedInfo(url)) return 'embed';
   if (getYouTubeId(url)) return 'youtube';
   if (/\.m3u8/i.test(url)) return 'hls';
   if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(url) || url.startsWith('blob:')) return 'video';
@@ -59,6 +63,7 @@ export function VideoPlayer({
 
   const sourceType = getSourceType(src);
   const youtubeId = sourceType === 'youtube' ? getYouTubeId(src) : null;
+  const embed = sourceType === 'embed' ? getEmbedInfo(src) : null;
 
   // Initialise HLS
   useEffect(() => {
@@ -173,6 +178,23 @@ export function VideoPlayer({
           className="w-full h-full"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
           allowFullScreen
+        />
+      </div>
+    );
+  }
+
+  if (sourceType === 'embed' && embed) {
+    return (
+      <div className={`aspect-video bg-black relative ${className}`}>
+        <iframe
+          src={withAutoplay(embed.src, autoPlay)}
+          title={title || 'Video'}
+          className="w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          scrolling="no"
+          frameBorder={0}
+          referrerPolicy="origin"
         />
       </div>
     );

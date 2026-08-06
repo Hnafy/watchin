@@ -44,4 +44,8 @@ export class AppError extends Error {
   static internal(message = 'Internal server error', details?: any) {
     return new AppError(message, 500, details);
   }
+
+  static badGateway(message = 'Bad gateway', details?: any) {
+    return new AppError(message, 502, details);
+  }
 }

@@ -31,6 +31,15 @@ export function SectionHeading({
       className={twMerge('flex items-end justify-between gap-4 mb-5 px-5 sm:px-8 lg:px-12', className)}
     >
       <div className="flex items-center gap-3 min-w-0">
+        <motion.span
+          initial={{ scaleY: 0, opacity: 0 }}
+          whileInView={{ scaleY: 1, opacity: 1 }}
+          viewport={{ once: true, margin: '-60px' }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          style={{ originY: 0 }}
+          className="h-5 w-1 shrink-0 rounded-full bg-gradient-to-b from-primary-400 to-primary-600"
+          aria-hidden="true"
+        />
         {icon && (
           <span className="hidden sm:flex h-9 w-9 items-center justify-center rounded-xl bg-primary-600/15 text-primary-400 border border-primary-500/20">
             {icon}
@@ -42,7 +51,7 @@ export function SectionHeading({
               {eyebrow}
             </p>
           )}
-          <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">
+          <h2 className="text-lg font-bold uppercase tracking-widest text-white whitespace-nowrap overflow-hidden text-ellipsis">
             {title}
             {count !== undefined && count > 0 && (
               <span className="ml-2 align-middle text-sm font-semibold text-dark-400">{count}</span>

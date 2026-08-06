@@ -23,6 +23,15 @@ export const tmdbController = {
     } catch (error) { next(error); }
   },
 
+  async getImages(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const tmdbId = parseInt(req.params.tmdbId);
+      const type = req.query.type as string || 'MOVIE';
+      const data = await tmdbService.getImages(tmdbId, type);
+      res.json({ status: 'success', data });
+    } catch (error) { next(error); }
+  },
+
   async import(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { tmdbId, type } = req.body;

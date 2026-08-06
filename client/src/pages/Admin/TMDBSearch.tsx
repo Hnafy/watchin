@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tmdbApi } from '../../services/api';
-import { Search, Film, Monitor, Loader2, AlertCircle, CheckCircle, Star } from 'lucide-react';
+import { Search, Film, Monitor, Loader2, AlertCircle, CheckCircle, Star, ArrowLeft } from 'lucide-react';
 
 interface TMDBResult {
   tmdbId: number;
@@ -38,8 +38,14 @@ export default function TMDBSearch() {
       try {
         const res = await tmdbApi.search(query, typeFilter === 'all' ? undefined : typeFilter);
         setResults(Array.isArray(res.data?.data) ? res.data.data : []);
-      } catch {
-        setError('Search failed. Please try again.');
+      } catch (err: any) {
+        const message = err?.response?.data?.message;
+        setError(
+          message ||
+            (err?.response?.status === 401
+              ? 'Invalid or missing TMDB API key. Add TMDB_API_KEY to server/.env.'
+              : 'Search failed. Please try again.'),
+        );
       } finally {
         setLoading(false);
       }
@@ -69,15 +75,21 @@ export default function TMDBSearch() {
   };
 
   return (
-    <div className="min-h-screen bg-dark-950 pt-20 pb-12">
+    <div className="min-h-screen pt-20 pb-12">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
+          <button
+            onClick={() => navigate('/admin')}
+            className="group mb-4 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-xl transition-all hover:-translate-x-0.5 hover:border-white/25 hover:bg-white/10 hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4 transition-transform duration-300 group-hover:-translate-x-0.5" /> Back
+          </button>
           <h1 className="text-2xl font-bold text-white">Import from TMDB</h1>
           <p className="mt-1 text-sm text-dark-400">Search movies and TV shows from The Movie Database and import them into your library.</p>
         </div>
 
         {/* Search bar */}
-        <div className="flex gap-3 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-dark-400" />
             <input
@@ -138,13 +150,14 @@ export default function TMDBSearch() {
             {results.map((item) => (
               <div
                 key={`${item.type}-${item.tmdbId}`}
-                className="flex gap-4 rounded-xl border border-dark-800 bg-dark-900/50 p-4 hover:border-dark-700 transition-colors"
+                className="group flex gap-4 rounded-xl border border-white/[0.08] bg-dark-900/70 p-4 shadow-card transition-all hover:border-white/[0.16] hover:-translate-y-0.5"
               >
                 <div className="flex-shrink-0 w-20">
                   {item.posterPath ? (
                     <img
                       src={item.posterPath}
                       alt={item.title}
+                      loading="lazy"
                       className="w-full rounded-lg object-cover aspect-[2/3]"
                     />
                   ) : (
@@ -157,7 +170,7 @@ export default function TMDBSearch() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h3 className="text-white font-semibold truncate">{item.title}</h3>
+                      <h3 className="text-white font-semibold truncate group-hover:text-primary-400 transition-colors">{item.title}</h3>
                       {item.originalTitle && item.originalTitle !== item.title && (
                         <p className="text-xs text-dark-500 truncate">{item.originalTitle}</p>
                       )}

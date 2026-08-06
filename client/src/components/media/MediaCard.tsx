@@ -14,6 +14,7 @@ interface MediaCardProps {
   onPlay?: () => void;
   onAddToList?: () => void;
   onLike?: () => void;
+  fill?: boolean;
 }
 
 function matchPercent(media: Media): number {
@@ -36,15 +37,18 @@ export function MediaCard({
   onPlay,
   onAddToList,
   onLike,
+  fill,
 }: MediaCardProps) {
   const isBanner = variant === "banner";
-  const widthClass = isBanner
-    ? "w-[320px] sm:w-[400px]"
-    : variant === "wide"
-      ? "w-[310px] sm:w-[380px]"
-      : variant === "compact"
-        ? "w-[160px] sm:w-[180px]"
-        : "w-[190px] sm:w-[220px]";
+  const widthClass = fill
+    ? "w-full"
+    : isBanner
+      ? "w-[320px] sm:w-[400px]"
+      : variant === "wide"
+        ? "w-[310px] sm:w-[380px]"
+        : variant === "compact"
+          ? "w-[160px] sm:w-[180px]"
+          : "w-[190px] sm:w-[220px]";
   const aspectClass = variant === "wide" || isBanner ? "aspect-video" : "aspect-[2/3]";
   const imgUrl = isBanner ? media.backdropUrl : media.posterUrl;
   const match = matchPercent(media);

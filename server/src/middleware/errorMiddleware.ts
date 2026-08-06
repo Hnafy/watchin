@@ -29,6 +29,13 @@ export const errorHandler = (
     });
   }
 
+  if (err.name === 'PayloadTooLargeError') {
+    return res.status(413).json({
+      status: 'error',
+      message: 'File is too large to upload',
+    });
+  }
+
   // Mongoose errors
   const mongoErr = err as { code?: number | string; name?: string; path?: string; keyPattern?: Record<string, unknown> };
   if (mongoErr.name === 'CastError') {

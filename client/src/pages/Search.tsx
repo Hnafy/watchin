@@ -373,7 +373,7 @@ export function Search() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-5 md:grid-cols-4 lg:grid-cols-5">
                 {data.data.map((media: Media, i: number) => (
-                  <MediaCard key={media.id} media={media} index={i} onClick={() => navigate(`/media/${media.slug}`)} onPlay={() => handlePlay(media)} onAddToList={() => handleAddToList(media)} onLike={() => handleLike(media)} />
+                  <MediaCard key={media.id} media={media} index={i} fill onClick={() => navigate(`/media/${media.slug}`)} onPlay={() => handlePlay(media)} onAddToList={() => handleAddToList(media)} onLike={() => handleLike(media)} />
                 ))}
               </motion.div>
 

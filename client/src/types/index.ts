@@ -1,3 +1,9 @@
+export interface MediaSource {
+  server?: string;
+  label?: string;
+  url: string;
+}
+
 export interface User {
   id: string; email: string; username: string; avatar?: string;
   role: 'USER' | 'ADMIN' | 'MODERATOR'; emailVerified: boolean; createdAt: string;
@@ -10,6 +16,7 @@ export interface Media {
   overview?: string; shortDescription?: string;
   posterUrl?: string; backdropUrl?: string; logoUrl?: string;
   trailerUrl?: string; watchUrl?: string;
+  sources?: MediaSource[];
   releaseDate?: string; firstAirDate?: string; lastAirDate?: string;
   productionYear?: number; runtime?: number;
   numberOfSeasons?: number; numberOfEpisodes?: number;
@@ -31,7 +38,7 @@ export interface Person { id: string; name: string; profilePath?: string; }
 export interface CastMember { id: string; mediaId: string; personId: string; person: Person; character?: string; order: number; }
 export interface Director { id: string; mediaId: string; personId: string; person: Person; order: number; }
 export interface Season { id: string; mediaId: string; seasonNumber: number; name?: string; overview?: string; posterUrl?: string; airDate?: string; episodeCount: number; episodes: Episode[]; }
-export interface Episode { id: string; mediaId: string; seasonId: string; episodeNumber: number; name: string; overview?: string; stillUrl?: string; airDate?: string; runtime?: number; watchUrl?: string; }
+export interface Episode { id: string; mediaId: string; seasonId: string; episodeNumber: number; name: string; overview?: string; stillUrl?: string; airDate?: string; runtime?: number; watchUrl?: string; sources?: MediaSource[]; }
 
 export interface FacetCount { value: string; count: number; slug?: string; code?: string; }
 
@@ -106,4 +113,16 @@ export interface RatingStats {
 
 export interface UserRatingResponse {
   rating: number | null;
+}
+
+export interface Comment {
+  id: string;
+  mediaId: string;
+  userId: string;
+  parentId?: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  user: { id: string; username: string; avatar?: string; role?: string };
+  replies?: Comment[];
 }

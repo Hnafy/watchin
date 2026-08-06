@@ -72,13 +72,22 @@ export const adminService = {
       'releaseDate', 'firstAirDate', 'lastAirDate', 'productionYear',
       'runtime', 'numberOfSeasons', 'numberOfEpisodes',
       'posterUrl', 'backdropUrl', 'logoUrl', 'trailerUrl', 'watchUrl',
-      'imdbRating', 'quality',
+      'imdbRating', 'quality', 'sources',
       'featured', 'isTrending', 'hidden',
     ];
     for (const key of allowed) {
       if (data[key] !== undefined) {
         cleaned[key] = data[key] === '' ? null : data[key];
       }
+    }
+    if (Array.isArray(data.sources)) {
+      cleaned.sources = data.sources
+        .map((s: any) => ({
+          server: s.server ? String(s.server) : null,
+          label: s.label ? String(s.label) : null,
+          url: String(s.url || '').trim(),
+        }))
+        .filter((s: any) => s.url);
     }
     if (cleaned.releaseDate) cleaned.releaseDate = new Date(cleaned.releaseDate);
     if (cleaned.firstAirDate) cleaned.firstAirDate = new Date(cleaned.firstAirDate);
@@ -176,6 +185,15 @@ export const adminService = {
               episodeNumber: ep.episodeNumber,
               name: ep.title || ep.name,
               watchUrl: ep.watchUrl || null,
+              sources: Array.isArray(ep.sources)
+                ? ep.sources
+                    .map((src: any) => ({
+                      server: src.server ? String(src.server) : null,
+                      label: src.label ? String(src.label) : null,
+                      url: String(src.url || '').trim(),
+                    }))
+                    .filter((src: any) => src.url)
+                : [],
             }))
           );
         }
@@ -214,6 +232,7 @@ export const adminService = {
         logoUrl: data.logoUrl,
         trailerUrl: data.trailerUrl,
         watchUrl: data.watchUrl,
+        sources: data.sources || [],
         imdbRating: data.imdbRating || undefined,
         quality: data.quality,
         featured: data.featured || false,
@@ -274,6 +293,15 @@ export const adminService = {
       logoUrl: input.logoUrl || null,
       trailerUrl: input.trailerUrl,
       watchUrl: input.watchUrl || null,
+      sources: Array.isArray(input.sources)
+        ? input.sources
+            .map((s: any) => ({
+              server: s.server ? String(s.server) : null,
+              label: s.label ? String(s.label) : null,
+              url: String(s.url || '').trim(),
+            }))
+            .filter((s: any) => s.url)
+        : [],
       imdbRating: input.imdbRating,
       quality: input.quality,
       featured: input.featured || false,
@@ -370,6 +398,15 @@ export const adminService = {
               episodeNumber: ep.episodeNumber,
               name: ep.title || ep.name,
               watchUrl: ep.watchUrl || null,
+              sources: Array.isArray(ep.sources)
+                ? ep.sources
+                    .map((src: any) => ({
+                      server: src.server ? String(src.server) : null,
+                      label: src.label ? String(src.label) : null,
+                      url: String(src.url || '').trim(),
+                    }))
+                    .filter((src: any) => src.url)
+                : [],
             }))
           );
         }
@@ -403,7 +440,12 @@ export const adminService = {
     seasons: Array<{
       seasonNumber: number;
       name?: string;
-      episodes: Array<{ episodeNumber: number; title: string; watchUrl?: string }>;
+      episodes: Array<{
+        episodeNumber: number;
+        title: string;
+        watchUrl?: string;
+        sources?: Array<{ label?: string; url: string }>;
+      }>;
     }>;
   }) {
     const slug = slugify(data.title);
@@ -444,6 +486,15 @@ export const adminService = {
             episodeNumber: ep.episodeNumber,
             name: ep.title,
             watchUrl: ep.watchUrl || null,
+            sources: Array.isArray(ep.sources)
+              ? ep.sources
+                  .map((src: any) => ({
+                    server: src.server ? String(src.server) : null,
+                    label: src.label ? String(src.label) : null,
+                    url: String(src.url || '').trim(),
+                  }))
+                  .filter((src: any) => src.url)
+              : [],
           }))
         );
       }

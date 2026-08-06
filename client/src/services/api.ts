@@ -1,7 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-export const API_URL = 'https://watchin-4crs.vercel.app/api';
-// export const API_URL = '/api';
+export const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const ACCESS_TOKEN_KEY = 'watchin_accessToken';
 const REFRESH_TOKEN_KEY = 'watchin_refreshToken';
@@ -131,6 +130,10 @@ export const userApi = {
   updateProfile: (data: { username?: string; email?: string }) => api.patch('/user/profile', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) => api.patch('/user/password', data),
   getStats: () => api.get('/user/stats'),
+  updateAvatar: (image: string) => api.post('/user/avatar', { image }),
+  getSettings: () => api.get('/user/settings'),
+  updateSettings: (data: Record<string, unknown>) => api.patch('/user/settings', data),
+  deleteAccount: () => api.delete('/user/account'),
 };
 
 export const notificationApi = {
@@ -178,5 +181,28 @@ export const recommendationApi = {
 export const tmdbApi = {
   search: (q: string, type?: string) => api.get('/tmdb/search', { params: { q, type } }),
   getDetails: (tmdbId: number, type: string) => api.get(`/tmdb/details/${tmdbId}`, { params: { type } }),
+  getImages: (tmdbId: number, type: string) => api.get(`/tmdb/images/${tmdbId}`, { params: { type } }),
   importMedia: (tmdbId: number, type: string) => api.post('/tmdb/import', { tmdbId, type }),
+};
+
+export const mixdropApi = {
+  upload: (file: File, onProgress?: (pct: number) => void) =>
+    api.post('/mixdrop/upload', file, {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Filename': encodeURIComponent(file.name),
+      },
+      timeout: 0,
+      onUploadProgress: (e) => {
+        if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+      },
+    }),
+};
+
+export const commentApi = {
+  getByMedia: (mediaId: string, page = 1, limit = 20) =>
+    api.get(`/comments/media/${mediaId}`, { params: { page, limit } }),
+  add: (mediaId: string, content: string) => api.post(`/comments/media/${mediaId}`, { content }),
+  reply: (commentId: string, content: string) => api.post(`/comments/${commentId}/reply`, { content }),
+  remove: (commentId: string) => api.delete(`/comments/${commentId}`),
 };

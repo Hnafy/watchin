@@ -32,6 +32,34 @@ export const changePasswordSchema = z.object({
     .max(128, 'New password must be at most 128 characters'),
 });
 
+export const avatarSchema = z.object({
+  image: z.string().regex(/^data:image\/(jpeg|png|webp);base64,.+$/, 'Image must be a valid JPEG, PNG, or WebP data URL'),
+});
+
+const settingsBool = z.boolean().optional();
+
+export const userSettingsSchema = z.object({
+  notifications: z.object({
+    emailUpdates: settingsBool,
+    newReleases: settingsBool,
+    watchlist: settingsBool,
+    comments: settingsBool,
+  }).optional(),
+  privacy: z.object({
+    publicProfile: settingsBool,
+    showWatchHistory: settingsBool,
+    showStats: settingsBool,
+  }).optional(),
+  playback: z.object({
+    autoplay: settingsBool,
+    resume: settingsBool,
+    defaultQuality: z.enum(['auto', '1080p', '720p', '480p']).optional(),
+  }).optional(),
+  appearance: z.object({
+    reduceMotion: settingsBool,
+  }).optional(),
+}).strict();
+
 export const mediaQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),

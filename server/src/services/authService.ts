@@ -98,6 +98,6 @@ export const authService = {
   },
 
   async getMe(userId: string) {
-    return User.findById(userId).select('id email username avatar role emailVerified createdAt');
+    return User.findById(userId).select('id email username avatar role emailVerified createdAt settings');
   },
 };

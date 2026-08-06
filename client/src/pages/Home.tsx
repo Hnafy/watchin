@@ -50,7 +50,7 @@ function HeroSlide({ media, active }: { media: Media; active: boolean }) {
 
   return (
     <div className="relative z-[2] h-full pl-6 pr-6 sm:pl-[8vw] sm:pr-10">
-      <div className="flex h-full items-center pb-24 pt-[72px]">
+        <div className="flex h-full items-center pb-24 pt-6">
         <div className="w-full max-w-[600px]">
           <div className="mb-5 flex items-center gap-2">
             <Chip tone="primary" className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest">

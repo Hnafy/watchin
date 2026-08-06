@@ -38,7 +38,7 @@ services:
       - ./client:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:4000
+      - VITE_API_PROXY_TARGET=http://server:4000
     depends_on:
       - server
 
@@ -59,7 +59,10 @@ services:
       - JWT_ACCESS_SECRET=your-super-secret-access-key-change-in-production-min-32-chars
       - JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-in-production-min-32-chars
       - CLIENT_URL=http://localhost:5173
-      - TMDB_API_KEY=your-tmdb-api-key
+      - TMDB_API_KEY=1a68b0b3695c7a1b3d40e733f9216c0f
+      - MIXDROP_EMAIL=abdallahalfeky18@gmail.com
+      - MIXDROP_KEY=4EVGd13ASvIzitK4RW
+      - IMGBB_API_KEY=b862099c9905e0f993edfc8a7c011e95
     depends_on:
       mongo:
         condition: service_healthy

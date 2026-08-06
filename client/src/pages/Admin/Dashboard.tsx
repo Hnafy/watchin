@@ -472,7 +472,7 @@ export function AdminDashboard() {
   };
 
   return (
-    <div className="relative min-h-screen bg-dark-950">
+    <div className="relative min-h-screen">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(60%_100%_at_50%_0%,rgba(124,58,237,0.14),transparent_70%)]" />
       <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-28 sm:px-6 lg:px-8">
         <motion.div

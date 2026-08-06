@@ -42,6 +42,11 @@ export const config = {
     baseUrl: 'https://api.themoviedb.org/3',
     imageBaseUrl: 'https://image.tmdb.org/t/p',
   },
+
+  imgbb: {
+    apiKey: process.env.IMGBB_API_KEY || '',
+    baseUrl: 'https://api.imgbb.com/1/upload',
+  },
   
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -57,6 +62,13 @@ export const config = {
   
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
+  },
+
+  mixdrop: {
+    email: process.env.MIXDROP_EMAIL || '',
+    key: process.env.MIXDROP_KEY || '',
+    uploadUrl: process.env.MIXDROP_UPLOAD_URL || 'https://ul.mixdrop.ag/api',
+    maxFileSize: 8 * 1024 * 1024 * 1024, // 8GB
   },
 
   upload: {

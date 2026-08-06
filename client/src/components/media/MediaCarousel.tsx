@@ -126,7 +126,7 @@ export function MediaCarousel({
       transition={{ duration: 0.5, ease: 'easeOut' }}
       className={`relative group/section ml-[calc(50%-48vw)] mr-[calc(50%-48vw)] py-6 ${className ?? ''}`}
     >
-      <div className="px-5 sm:px-8 lg:px-12 mb-4 flex items-end justify-between gap-4">
+      <div className="px-5 sm:px-8 lg:px-12 mb-7 flex items-end justify-between gap-4">
         <SectionHeading title={title} subtitle={subtitle} eyebrow={eyebrow} icon={icon} className="mb-0 px-0 sm:px-0 lg:px-0" />
         <div className="hidden sm:flex items-center gap-2 opacity-0 group-hover/section:opacity-100 transition-opacity duration-300">
           <button
