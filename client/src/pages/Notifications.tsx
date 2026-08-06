@@ -19,7 +19,7 @@ interface Notification {
   createdAt: string;
 }
 
-export function Notifications() {
+export function NotificationsPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { t } = useI18n();
@@ -27,7 +27,7 @@ export function Notifications() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications'],
-    queryFn: () => userApi.getNotifications().then((r) => r.data.data),
+    queryFn: () => userApi.getNotifications().then((r) => r.data.data as Notification[]),
     staleTime: 60_000,
   });
 
@@ -56,7 +56,7 @@ export function Notifications() {
     filter === 'all' || !n.read
   );
 
-  const unreadCount = data?.filter((n: Notification) => !n.read).length || 0;
+  const unreadCount = data?.filter((n) => !n.read).length || 0;
 
   const getNotificationIcon = (type: string) => {
     switch (type) {

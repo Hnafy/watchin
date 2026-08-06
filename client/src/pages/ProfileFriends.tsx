@@ -20,7 +20,7 @@ export function ProfileFriends() {
 
   const { data: friends } = useQuery({
     queryKey: ['profile', username, 'friends', mode],
-    queryFn: () => userApi.getUserFriends(username, mode).then((r) => r.data.data),
+    queryFn: () => userApi.getUserFriends(username, mode).then((r) => r.data.data as Friend[]),
     enabled: !!username,
     staleTime: 60_000,
   });

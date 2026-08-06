@@ -16,7 +16,7 @@ interface HistoryItem {
   media: { slug: string; title: string; posterUrl?: string };
 }
 
-export function History() {
+export function HistoryPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [page, setPage] = useState(1);

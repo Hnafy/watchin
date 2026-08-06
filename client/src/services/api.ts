@@ -134,6 +134,11 @@ export const userApi = {
   getSettings: () => api.get('/user/settings'),
   updateSettings: (data: Record<string, unknown>) => api.patch('/user/settings', data),
   deleteAccount: () => api.delete('/user/account'),
+  getProfile: (username: string) => api.get(`/profile/${username}`),
+  getUserFriends: (username: string, mode: string) => api.get(`/profile/${username}/${mode}`),
+  getNotifications: () => api.get('/notifications'),
+  markNotificationAsRead: (notificationId: string) => api.patch(`/notifications/${notificationId}/read`),
+  deleteAllReadNotifications: () => api.delete('/notifications/read-all'),
 };
 
 export const notificationApi = {
