@@ -1,5 +1,5 @@
 import { config } from '../config/index.js';
-import { Media, Genre, Country, Language, Keyword, Person, CastMember, Director, Season } from '../db/models.js';
+import { Media, Genre, Country, Language, Keyword, Season, Episode } from '../db/models.js';
 import { slugify, ensureGenre, ensureCountry, ensureLanguage } from '../db/utils.js';
 import { AppError } from '../utils/AppError.js';
 
@@ -27,14 +27,6 @@ const tmdbFetch = async (path: string, params: Record<string, string> = {}): Pro
 function detectType(mediaType: string): 'MOVIE' | 'TV_SHOW' {
   if (mediaType === 'tv') return 'TV_SHOW';
   return 'MOVIE';
-}
-
-async function ensurePerson(name: string, profilePath: string | null) {
-  let person = await Person.findOne({ name });
-  if (!person) {
-    person = await Person.create({ name, profilePath });
-  }
-  return person;
 }
 
 export const tmdbService = {
@@ -101,7 +93,7 @@ export const tmdbService = {
   },
 
   async import(tmdbId: number, type: string) {
-    const endpoint = type === 'TV_SHOW' ? 'tv' : 'movie';
+    const endpoint = ['TV_SHOW', 'ANIME'].includes(type) ? 'tv' : 'movie';
     const data = await tmdbFetch(`/${endpoint}/${tmdbId}`, {
       append_to_response: 'credits,external_ids,videos,keywords',
     });
@@ -167,33 +159,6 @@ export const tmdbService = {
       languages: languages.map((l) => l._id),
     });
 
-    const castMembers = (data.credits?.cast || []).slice(0, 20);
-    for (let i = 0; i < castMembers.length; i++) {
-      const c = castMembers[i];
-      const person = await ensurePerson(c.name, c.profile_path
-        ? `${config.tmdb.imageBaseUrl}/w185${c.profile_path}`
-        : null);
-      await CastMember.updateOne(
-        { mediaId: media._id, personId: person._id, character: c.character || '' },
-        { $set: { order: i } },
-        { upsert: true }
-      );
-    }
-
-    const crew = data.credits?.crew || [];
-    const directors = crew.filter((c: any) => c.job === 'Director');
-    for (let i = 0; i < directors.length; i++) {
-      const d = directors[i];
-      const person = await ensurePerson(d.name, d.profile_path
-        ? `${config.tmdb.imageBaseUrl}/w185${d.profile_path}`
-        : null);
-      await Director.updateOne(
-        { mediaId: media._id, personId: person._id },
-        { $set: { order: i } },
-        { upsert: true }
-      );
-    }
-
     const keywordResults = data.keywords?.keywords || data.keywords?.results || [];
     const keywordIds: any[] = [];
     for (const kw of keywordResults.slice(0, 30)) {
@@ -209,23 +174,61 @@ export const tmdbService = {
       await Media.updateOne({ _id: media._id }, { $addToSet: { keywords: { $each: keywordIds } } });
     }
 
-    if (type === 'TV_SHOW' && data.seasons) {
-      for (const s of data.seasons) {
-        if (s.season_number === 0) continue;
-        await Season.create({
-          mediaId: media._id,
-          seasonNumber: s.season_number,
-          name: s.name || null,
-          overview: s.overview || null,
-          posterUrl: s.poster_path
-            ? `${config.tmdb.imageBaseUrl}/w500${s.poster_path}`
-            : null,
-          airDate: s.air_date ? new Date(s.air_date) : null,
-          episodeCount: s.episode_count || 0,
-        });
+    if (type === 'TV_SHOW' || type === 'ANIME') {
+      if (data.seasons) {
+        for (const s of data.seasons) {
+          if (s.season_number === 0) continue;
+          await Season.create({
+            mediaId: media._id,
+            seasonNumber: s.season_number,
+            name: s.name || null,
+            overview: s.overview || null,
+            posterUrl: s.poster_path
+              ? `${config.tmdb.imageBaseUrl}/w500${s.poster_path}`
+              : null,
+            airDate: s.air_date ? new Date(s.air_date) : null,
+            episodeCount: s.episode_count || 0,
+          });
+        }
       }
+
+      await tmdbService.importEpisodes(tmdbId, media._id);
     }
 
     return media;
+  },
+
+  /** Imports episode metadata for every season of a TV show / anime. */
+  async importEpisodes(tmdbId: number, mediaId: unknown) {
+    const seasons = await Season.find({ mediaId }).sort({ seasonNumber: 1 });
+    let count = 0;
+
+    for (const season of seasons) {
+      const seasonData = await tmdbFetch(`/tv/${tmdbId}/season/${season.seasonNumber}`);
+      for (const ep of seasonData.episodes || []) {
+        await Episode.updateOne(
+          { mediaId, seasonId: season._id, episodeNumber: ep.episode_number },
+          {
+            $set: {
+              mediaId,
+              seasonId: season._id,
+              episodeNumber: ep.episode_number,
+              name: ep.name || `Episode ${ep.episode_number}`,
+              overview: ep.overview || null,
+              stillUrl: ep.still_path
+                ? `${config.tmdb.imageBaseUrl}/w500${ep.still_path}`
+                : null,
+              airDate: ep.air_date ? new Date(ep.air_date) : null,
+              runtime: ep.runtime || null,
+            },
+            $setOnInsert: { watchUrl: null, sources: [] },
+          },
+          { upsert: true }
+        );
+        count += 1;
+      }
+    }
+
+    console.log(`  → imported ${count} episodes for TMDB ${tmdbId}`);
   },
 };

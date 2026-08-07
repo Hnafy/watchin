@@ -16,7 +16,6 @@
     "axios": "^1.6.8",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
-    "firebase": "^12.17.1",
     "framer-motion": "^12.42.2",
     "helmet": "^8.3.0",
     "hls.js": "^1.6.16",

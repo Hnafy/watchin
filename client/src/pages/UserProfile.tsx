@@ -1,24 +1,17 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { userApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { Avatar } from '../components/ui/Avatar';
 import { Chip } from '../components/ui/Chip';
-import { PlaylistCard } from './Playlists/PlaylistsListPage';
-import {
-  UserPlus, Check, X, Heart, Film, Calendar, Loader2, Mail, Sparkles,
-} from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Mail, Calendar, Settings, Film, Star } from 'lucide-react';
+import { useI18n } from '../i18n/LanguageProvider';
 
-interface PublicPlaylist {
-  id: string;
-  title: string;
-  description?: string;
-  coverImage?: string;
-  likeCount: number;
-  saveCount: number;
-  items: Array<{ mediaId: { title?: string; slug?: string; posterUrl?: string } }>;
+interface UserStats {
+  totalWatches: number;
+  watchlistCount: number;
+  ratingCount: number;
 }
 
 interface UserProfileData {
@@ -26,22 +19,15 @@ interface UserProfileData {
   username: string;
   avatar?: string;
   role: string;
+  emailVerified: boolean;
   createdAt: string;
-  stats: { followers: number; following: number; friends: number; likes: number };
-  publicPlaylists: PublicPlaylist[];
-  relationship: {
-    isFollowing: boolean;
-    isFriend: boolean;
-    hasLiked: boolean;
-    requestStatus: 'sent' | 'received' | null;
-    requestId: string | null;
-  };
+  stats: UserStats;
 }
 
 export function UserProfile() {
   const { username = '' } = useParams<{ username: string }>();
   const { user, isAuthenticated } = useAuth();
-  const qc = useQueryClient();
+  const { t } = useI18n();
 
   const { data: profile, isLoading } = useQuery<UserProfileData>({
     queryKey: ['profile', username],
@@ -51,34 +37,6 @@ export function UserProfile() {
     },
     enabled: !!username,
     staleTime: 30_000,
-  });
-
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['profile', username] });
-
-  const followMutation = useMutation({
-    mutationFn: () => userApi.toggleFollow(profile!.id),
-    onSuccess: () => { invalidate(); },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to update follow'),
-  });
-
-  const likeMutation = useMutation({
-    mutationFn: () => userApi.likeProfile(profile!.id),
-    onSuccess: () => { invalidate(); },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to update like'),
-  });
-
-  const friendMutation = useMutation({
-    mutationFn: async () => {
-      if (profile!.relationship.requestStatus === 'received' && profile!.relationship.requestId) {
-        await userApi.respondFriendRequest(profile!.relationship.requestId, 'accept');
-      } else if (profile!.relationship.requestStatus === 'sent' && profile!.relationship.requestId) {
-        await userApi.cancelFriendRequest(profile!.relationship.requestId);
-      } else {
-        await userApi.sendFriendRequest(profile!.id);
-      }
-    },
-    onSuccess: () => { invalidate(); },
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to update friend request'),
   });
 
   if (isLoading) {
@@ -99,13 +57,12 @@ export function UserProfile() {
   }
 
   const isSelf = user?.id === profile.id;
-  const { relationship, stats } = profile;
+  const { stats } = profile;
 
   const statCards = [
-    { label: 'Followers', value: stats.followers },
-    { label: 'Following', value: stats.following },
-    { label: 'Friends', value: stats.friends },
-    { label: 'Likes', value: stats.likes },
+    { label: t('profile.titlesWatched'), value: stats.totalWatches, icon: Film },
+    { label: t('profile.myList'), value: stats.watchlistCount, icon: Star },
+    { label: t('profile.ratings'), value: stats.ratingCount, icon: Star },
   ];
 
   return (
@@ -151,112 +108,27 @@ export function UserProfile() {
                 )}
               </div>
 
-              {!isSelf && isAuthenticated && (
-                <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <button
-                    onClick={() => followMutation.mutate()}
-                    disabled={followMutation.isPending}
-                    className={`btn inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold ${
-                      relationship.isFollowing
-                        ? 'border border-white/10 bg-white/[0.06] text-dark-200 hover:bg-white/[0.1]'
-                        : 'btn-primary'
-                    }`}
-                  >
-                    {followMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                    {relationship.isFollowing ? 'Following' : 'Follow'}
-                  </button>
-
-                  {!relationship.isFriend && (
-                    <button
-                      onClick={() => friendMutation.mutate()}
-                      disabled={friendMutation.isPending}
-                      className={`btn inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold ${
-                        relationship.requestStatus === 'received'
-                          ? 'border border-green-500/40 bg-green-500/15 text-green-400 hover:bg-green-500/25'
-                          : 'btn-glass'
-                      }`}
-                    >
-                      {friendMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : relationship.requestStatus === 'sent' ? (
-                        <X className="h-4 w-4" />
-                      ) : relationship.requestStatus === 'received' ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <UserPlus className="h-4 w-4" />
-                      )}
-                      {relationship.requestStatus === 'sent'
-                        ? 'Request sent'
-                        : relationship.requestStatus === 'received'
-                          ? 'Accept request'
-                          : 'Add friend'}
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => likeMutation.mutate()}
-                    disabled={likeMutation.isPending}
-                    className={`btn inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold ${
-                      relationship.hasLiked
-                        ? 'border border-red-500/40 bg-red-500/15 text-red-400 hover:bg-red-500/25'
-                        : 'btn-glass'
-                    }`}
-                  >
-                    {likeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className={`h-4 w-4 ${relationship.hasLiked ? 'fill-red-500' : ''}`} />}
-                    {relationship.hasLiked ? 'Liked' : 'Like'}
-                  </button>
-                </div>
+              {isSelf && isAuthenticated && (
+                <button
+                  onClick={() => window.location.href = '/settings'}
+                  className="btn-glass mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
+                >
+                  <Settings className="h-4 w-4" /> {t('header.settings')}
+                </button>
               )}
             </div>
           </div>
 
-          <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-7 grid grid-cols-3 gap-3 sm:grid-cols-3">
             {statCards.map((s) => (
               <div key={s.label} className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 text-center">
+                <s.icon className="mx-auto mb-2 h-5 w-5 text-primary-400" />
                 <p className="text-2xl font-black">{s.value.toLocaleString()}</p>
                 <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-dark-400">{s.label}</p>
               </div>
             ))}
           </div>
-
-          {!isSelf && (
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-4 text-sm sm:justify-start">
-              <Link to={`/user/${profile.username}/friends`} className="text-primary-400 hover:text-primary-300 font-medium transition-colors">
-                View friends & followers
-              </Link>
-            </div>
-          )}
         </motion.div>
-
-        {/* Public playlists */}
-        <div className="mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 font-display text-xl font-bold text-white">
-              <Sparkles className="h-5 w-5 text-primary-400" /> Public Playlists
-            </h2>
-            <span className="text-sm text-dark-400">{profile.publicPlaylists.length} total</span>
-          </div>
-
-          {profile.publicPlaylists.length === 0 ? (
-            <div className="glass-card p-12 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-dark-800">
-                <Film className="h-8 w-8 text-dark-600" />
-              </div>
-              <p className="text-dark-400">{isSelf ? 'You have no public playlists yet.' : `${profile.username} has no public playlists yet.`}</p>
-              {isSelf && (
-                <Link to="/playlists/new" className="btn-primary mt-4 inline-flex items-center gap-2 text-sm">
-                  <UserPlus className="h-4 w-4" /> Create a playlist
-                </Link>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {profile.publicPlaylists.map((p) => (
-                <PlaylistCard key={p.id} playlist={p as any} />
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

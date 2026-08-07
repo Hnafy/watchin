@@ -238,12 +238,13 @@ export function Home() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const mode = location.pathname === '/tv-shows' ? 'series' : location.pathname === '/movies' ? 'movies' : location.pathname === '/trending' ? 'trending' : 'all';
+  const mode = location.pathname === '/tv-shows' ? 'series' : location.pathname === '/movies' ? 'movies' : location.pathname === '/trending' ? 'trending' : location.pathname === '/anime' ? 'anime' : 'all';
 
   const { data: trending = [] } = useTrending({ period: 'week', limit: 20 });
   const { data: trendingToday = [] } = useTrending({ period: 'day', limit: 18 });
   const { data: movies = [] } = useTopRated({ limit: 12, type: 'MOVIE' });
   const { data: shows = [] } = useTopRated({ limit: 12, type: 'TV_SHOW' });
+  const { data: anime = [] } = useTopRated({ limit: 12, type: 'ANIME' });
   const { data: continueWatching = [] } = useContinueWatching(12);
   const { data: recs } = useAiRecommendations({ limit: 20 });
 
@@ -282,7 +283,7 @@ return (
     <>
       <SEOPage
         title="Watchin — Premium Streaming for Movies, TV Shows & Anime"
-        description="Stream movies, TV shows, and anime in 4K HDR. Personalized recommendations, watchlists, and seamless playback across devices."
+        description="Stream movies, TV shows, and anime. Build your watchlist and pick up where you left off on any device."
         canonical="/"
         structuredData={{
           '@context': 'https://schema.org',
@@ -507,10 +508,28 @@ return (
                  className="pt-6"
                />
              )}
-<GenreSections onItemClick={goToMedia} onBrowse={goBrowse} typeFilter="TV_SHOW" onPlay={handlePlay} onAddToList={handleAddToList} onLike={handleLike} />
-            </>
-          )}
-       </div>
+ <GenreSections onItemClick={goToMedia} onBrowse={goBrowse} typeFilter="TV_SHOW" onPlay={handlePlay} onAddToList={handleAddToList} onLike={handleLike} />
+           </>
+         )}
+
+         {mode === 'anime' && (
+           <>
+             {anime.length > 0 && (
+               <MediaCarousel
+                 title="Top Rated Anime"
+                 icon={<Sparkles className="h-4 w-4" />}
+                 items={anime}
+                 onItemClick={goToMedia}
+                 onPlay={handlePlay}
+                 onAddToList={handleAddToList}
+                 onLike={handleLike}
+                 className="pt-6"
+               />
+             )}
+             <GenreSections onItemClick={goToMedia} onBrowse={goBrowse} typeFilter="ANIME" onPlay={handlePlay} onAddToList={handleAddToList} onLike={handleLike} />
+           </>
+         )}
+      </div>
      </div>
    </>
   );
@@ -521,7 +540,7 @@ return (
 interface GenreSectionsProps {
   onItemClick: (m: Media) => void;
   onBrowse: (slug: string) => void;
-  typeFilter?: 'MOVIE' | 'TV_SHOW';
+  typeFilter?: 'MOVIE' | 'TV_SHOW' | 'ANIME';
   onPlay?: (m: Media) => void;
   onAddToList?: (m: Media) => void;
   onLike?: (m: Media) => void;
@@ -558,9 +577,9 @@ function GenreSections({ onItemClick, onBrowse, typeFilter, onPlay, onAddToList,
 function GenreSection({ genreSlug, genreName, onItemClick, onBrowse, typeFilter, onPlay, onAddToList, onLike }: {
   genreSlug: string;
   genreName: string;
+  typeFilter?: 'MOVIE' | 'TV_SHOW' | 'ANIME';
   onItemClick: (m: Media) => void;
   onBrowse: (slug: string) => void;
-  typeFilter?: 'MOVIE' | 'TV_SHOW';
   onPlay?: (m: Media) => void;
   onAddToList?: (m: Media) => void;
   onLike?: (m: Media) => void;

@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express';
 import { mediaService } from '../services/mediaService.js';
 import { analyticsService } from '../services/analyticsService.js';
 import { AuthRequest } from '../middleware/authMiddleware.js';
-import { Genre, Country, Person, Media, SearchLog } from '../db/models.js';
+import { Genre, Country, Media, SearchLog } from '../db/models.js';
 import { escapeRegex } from '../db/utils.js';
 import crypto from 'crypto';
 
@@ -111,61 +111,13 @@ export const mediaController = {
     }
   },
 
-  async searchMedia(req: AuthRequest, res: Response, next: NextFunction) {
+async searchMedia(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { q, ...filters } = req.query;
       if (!q || typeof q !== 'string')
         return res.status(400).json({ status: 'error', message: 'Search query required' });
       const result = await mediaService.getMediaList({ ...filters, search: q } as any);
       res.json({ status: 'success', ...result });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async searchPeople(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const q = typeof req.query.search === 'string' ? req.query.search.trim() : '';
-      if (!q) return res.json({ status: 'success', data: [] });
-      const limit = Math.min(Number(req.query.limit) || 10, 20);
-      const data = await Person.find({ name: { $regex: escapeRegex(q), $options: 'i' } })
-        .sort({ name: 1 })
-        .limit(limit)
-        .select('name profilePath');
-      res.json({ status: 'success', data });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  /**
-   * Combined type-ahead suggestions: matching titles + people (actors/directors).
-   * Used by the header live-search dropdown.
-   */
-  async suggest(req: AuthRequest, res: Response, next: NextFunction) {
-    try {
-      const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-      if (q.length < 2) return res.json({ status: 'success', data: { media: [], people: [] } });
-      const limit = Math.min(Number(req.query.limit) || 6, 10);
-
-      const [media, people] = await Promise.all([
-        Media.find({
-          status: 'RELEASED',
-          $or: [
-            { title: { $regex: escapeRegex(q), $options: 'i' } },
-            { originalTitle: { $regex: escapeRegex(q), $options: 'i' } },
-          ],
-        })
-          .sort({ viewCount: -1, popularity: -1 })
-          .limit(limit)
-          .select('slug title type posterUrl releaseDate imdbRating originalTitle'),
-        Person.find({ name: { $regex: escapeRegex(q), $options: 'i' } })
-          .sort({ name: 1 })
-          .limit(Math.min(limit, 4))
-          .select('name profilePath'),
-      ]);
-
-      res.json({ status: 'success', data: { media, people } });
     } catch (error) {
       next(error);
     }
@@ -218,6 +170,16 @@ export const mediaController = {
         )
         .catch(() => {});
       res.json({ status: 'success' });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async getWatchSource(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const episodeId = typeof req.query.episodeId === 'string' ? req.query.episodeId : undefined;
+      const source = await mediaService.getWatchSource(req.params.id, episodeId);
+      res.json({ status: 'success', data: source });
     } catch (error) {
       next(error);
     }

@@ -1,6 +1,8 @@
-import { Media, AdminMediaInput, User, Rating, PageView, DailyStat, SiteSetting, WatchHistory, WatchlistItem, Season, Episode, CastMember, Director, TrendingMedia } from '../db/models.js';
+import { Media, AdminMediaInput, User, Rating, PageView, DailyStat, SiteSetting, WatchHistory, WatchlistItem, WatchlistFolder, Notification, RefreshToken, Comment, BlockedEmail, Season, Episode, TrendingMedia } from '../db/models.js';
 import { subDays, startOfDay, format } from 'date-fns';
 import { escapeRegex, attachCountsToMedia, mediaCountsMap, userCountsMap } from '../db/utils.js';
+import { createNotification } from './notificationService.js';
+import { sendWarningEmail, sendBannedEmail } from './emailService.js';
 
 export const analyticsService = {
   async trackPageView(path: string, mediaId?: string, ip?: string, userAgent?: string, referer?: string) {
@@ -89,8 +91,6 @@ export const analyticsService = {
 
     await Promise.all([
       Media.deleteOne({ _id: id }),
-      CastMember.deleteMany({ mediaId: id }),
-      Director.deleteMany({ mediaId: id }),
       Season.deleteMany({ mediaId: id }),
       Episode.deleteMany({ mediaId: id }),
       Rating.deleteMany({ mediaId: id }),
@@ -144,7 +144,7 @@ export const analyticsService = {
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        .select('id email username avatar role createdAt lastLoginAt'),
+        .select('id email username avatar role emailVerified createdAt lastLoginAt warningCount isBanned'),
       User.countDocuments(where),
     ]);
 
@@ -162,12 +162,65 @@ export const analyticsService = {
     return User.findByIdAndUpdate(id, { $set: { role } }, { new: true });
   },
 
+  async updateUserVerified(id: string, emailVerified: boolean) {
+    return User.findByIdAndUpdate(id, { $set: { emailVerified: Boolean(emailVerified) } }, { new: true });
+  },
+
+  /**
+   * Sends an "alarm" (warning) to a user, typically for filing false reports.
+   * After 4 warnings the user's email is blocked and the account deleted.
+   * Returns { warningCount, banned, deleted }.
+   */
+  async warnUser(id: string, adminId: string, reason?: string) {
+    const user = await User.findById(id);
+    if (!user) return null;
+
+    const nextCount = (user.warningCount || 0) + 1;
+    const banned = nextCount >= 4;
+
+    await User.updateOne({ _id: id }, { $set: { warningCount: nextCount, isBanned: banned } });
+
+    const note = reason ? reason.trim() : 'Repeated false reports';
+    const link = '/notifications';
+
+    if (banned) {
+      await BlockedEmail.create({
+        email: user.email.toLowerCase(),
+        note: `Auto-blocked after ${nextCount} warnings: ${note}`,
+        blockedBy: adminId,
+      }).catch(() => {});
+      await Comment.updateMany(
+        { userId: id },
+        { $set: { hidden: true, moderationStatus: 'FLAGGED' } }
+      );
+      await this.deleteUser(id);
+      sendBannedEmail(user.email).catch(() => {});
+      return { warningCount: nextCount, banned, deleted: true };
+    }
+
+    await createNotification({
+      userId: id,
+      type: 'WARNING',
+      title: `Warning ${nextCount}/4`,
+      body: note,
+      link,
+      relatedUserId: adminId,
+    });
+    sendWarningEmail(user.email, nextCount).catch(() => {});
+
+    return { warningCount: nextCount, banned: false, deleted: false };
+  },
+
   async deleteUser(id: string) {
     await Promise.all([
       User.deleteOne({ _id: id }),
       WatchHistory.deleteMany({ userId: id }),
       Rating.deleteMany({ userId: id }),
       WatchlistItem.deleteMany({ userId: id }),
+      WatchlistFolder.deleteMany({ userId: id }),
+      Notification.deleteMany({ $or: [{ userId: id }, { relatedUserId: id }] }),
+      RefreshToken.deleteMany({ userId: id }),
+      Comment.deleteMany({ userId: id }),
     ]);
   },
 

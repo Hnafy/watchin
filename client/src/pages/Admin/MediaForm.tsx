@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { adminApi, mediaApi, mixdropApi } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import { Input, Textarea } from '../../components/ui/Input';
-import { Media, Person, MediaSource } from '../../types';
+import { Media, MediaSource } from '../../types';
 import toast from 'react-hot-toast';
 import { StarRating } from '../../components/ui/StarRating';
 import { SeasonEpisodeForm, SeasonDraft } from '../../components/admin/SeasonEpisodeForm';
@@ -40,8 +40,8 @@ interface MediaFormData {
   countries: string[];
   languages: string[];
   seasons: SeasonDraft[];
-  cast: Array<{ personId: string; name: string; character: string }>;
-  directors: Array<{ personId: string; name: string }>;
+  cast: Array<{ name: string; character: string }>;
+  directors: Array<{ name: string }>;
   featured: boolean;
   isTrending: boolean;
   hidden: boolean;
@@ -98,9 +98,6 @@ export function AdminMediaForm() {
 
   const [form, setForm] = useState<MediaFormData>({ ...defaultForm });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [castSearch, setCastSearch] = useState('');
-  const [directorSearch, setDirectorSearch] = useState('');
-  const [searchResults, setSearchResults] = useState<Person[]>([]);
   const [imgBroken, setImgBroken] = useState<Record<string, boolean>>({});
 
   const { data: existingMedia, isLoading: loadingExisting } = useQuery({
@@ -152,8 +149,8 @@ export function AdminMediaForm() {
             sources: ep.sources?.map((src: any) => ({ server: src.server || '', label: src.label || '', url: src.url })) || [],
           })),
         })) || [],
-        cast: existingMedia.cast?.map(c => ({ personId: c.person.id, name: c.person.name, character: c.character || '' })) || [],
-        directors: existingMedia.directors?.map(d => ({ personId: d.person.id, name: d.person.name })) || [],
+        cast: existingMedia.cast?.map(c => ({ name: c.person.name, character: c.character || '' })) || [],
+        directors: existingMedia.directors?.map(d => ({ name: d.person.name })) || [],
         featured: existingMedia.featured || false,
         isTrending: existingMedia.isTrending || false,
         hidden: existingMedia.hidden || false,
@@ -216,8 +213,8 @@ export function AdminMediaForm() {
       if (isEdit) {
         await adminApi.updateMediaRecord(id!, payload);
       } else {
-        payload.cast = data.cast.map(c => ({ personId: c.personId, character: c.character, order: 0 }));
-        payload.directors = data.directors.map(d => ({ personId: d.personId, order: 0 }));
+        payload.cast = data.cast.map((c, i) => ({ name: c.name, character: c.character, order: i }));
+        payload.directors = data.directors.map((d, i) => ({ name: d.name, order: i }));
         await adminApi.createMedia(payload);
       }
     },
@@ -244,35 +241,6 @@ export function AdminMediaForm() {
 
   const removeArrayItem = (key: 'genres' | 'keywords' | 'countries' | 'languages', value: string) => {
     setForm(prev => ({ ...prev, [key]: prev[key].filter(v => v !== value) }));
-  };
-
-  const searchPersonFn = async (q: string) => {
-    if (q.length < 2) { setSearchResults([]); return; }
-    try {
-      const res = await mediaApi.searchPeople(q);
-      setSearchResults(res.data.data?.map((p: any) => ({ id: p.id, name: p.name })) || []);
-    } catch { setSearchResults([]); }
-  };
-
-  useEffect(() => {
-    const t = setTimeout(() => searchPersonFn(castSearch || directorSearch), 300);
-    return () => clearTimeout(t);
-  }, [castSearch, directorSearch]);
-
-  const addCast = (person: Person) => {
-    if (!form.cast.some(c => c.personId === person.id)) {
-      update('cast', [...form.cast, { personId: person.id, name: person.name, character: '' }]);
-    }
-    setCastSearch('');
-    setSearchResults([]);
-  };
-
-  const addDirector = (person: Person) => {
-    if (!form.directors.some(d => d.personId === person.id)) {
-      update('directors', [...form.directors, { personId: person.id, name: person.name }]);
-    }
-    setDirectorSearch('');
-    setSearchResults([]);
   };
 
   if (isEdit && loadingExisting) {
@@ -568,12 +536,20 @@ export function AdminMediaForm() {
                 <FieldLabel>Cast</FieldLabel>
                 <div className="space-y-2 mb-2">
                   {form.cast.map((c, i) => (
-                    <motion.div key={`${c.personId}-${i}`} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                    <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                       className="flex items-center gap-2 bg-dark-800/60 rounded-lg border border-dark-700 px-3 py-2">
                       <div className="w-7 h-7 rounded-md bg-primary-600/15 flex items-center justify-center text-primary-400 text-xs font-bold">
                         {c.name.charAt(0).toUpperCase()}
                       </div>
-                      <span className="text-sm text-white font-medium min-w-[100px] truncate">{c.name}</span>
+                      <input
+                        type="text" value={c.name} onChange={e => {
+                          const n = [...form.cast];
+                          n[i] = { ...n[i], name: e.target.value };
+                          update('cast', n);
+                        }}
+                        placeholder="Name"
+                        className="flex-1 px-3 py-1 rounded-md bg-dark-800 border border-dark-600 text-xs text-dark-200 placeholder:text-dark-500 focus:outline-none focus:border-primary-500/50 min-w-0"
+                      />
                       <input
                         type="text" value={c.character} onChange={e => {
                           const n = [...form.cast];
@@ -590,11 +566,10 @@ export function AdminMediaForm() {
                     </motion.div>
                   ))}
                 </div>
-                <PersonSearchInput
-                  value={castSearch} onChange={setCastSearch} results={searchResults}
-                  placeholder="Search person to add to cast..."
-                  onPick={addCast}
-                />
+                <button type="button" onClick={() => update('cast', [...form.cast, { name: '', character: '' }])}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary-500/30 bg-primary-600/10 text-primary-400 text-sm font-medium hover:bg-primary-600/20 transition-colors">
+                  <Plus className="h-4 w-4" /> Add Cast Member
+                </button>
               </div>
 
               {/* Directors */}
@@ -602,9 +577,17 @@ export function AdminMediaForm() {
                 <FieldLabel>Directors</FieldLabel>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {form.directors.map((d, i) => (
-                    <motion.span key={`${d.personId}-${i}`} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+                    <motion.span key={i} initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-dark-800 border border-dark-700 text-sm text-white">
-                      <span className="text-primary-400">•</span> {d.name}
+                      <span className="text-primary-400">•</span>
+                      <input
+                        type="text" value={d.name} onChange={e => {
+                          const n = [...form.directors];
+                          n[i] = { ...n[i], name: e.target.value };
+                          update('directors', n);
+                        }}
+                        className="px-2 py-1 rounded bg-dark-800 border border-dark-600 text-sm text-white focus:outline-none focus:border-primary-500/50 min-w-[120px]"
+                      />
                       <button type="button" onClick={() => update('directors', form.directors.filter((_, j) => j !== i))}
                         className="text-dark-500 hover:text-red-400 transition-colors">
                         <X className="h-3.5 w-3.5" />
@@ -612,11 +595,10 @@ export function AdminMediaForm() {
                     </motion.span>
                   ))}
                 </div>
-                <PersonSearchInput
-                  value={directorSearch} onChange={setDirectorSearch} results={searchResults}
-                  placeholder="Search person to add as director..."
-                  onPick={addDirector}
-                />
+                <button type="button" onClick={() => update('directors', [...form.directors, { name: '' }])}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary-500/30 bg-primary-600/10 text-primary-400 text-sm font-medium hover:bg-primary-600/20 transition-colors">
+                  <Plus className="h-4 w-4" /> Add Director
+                </button>
               </div>
             </motion.section>
 
@@ -963,51 +945,6 @@ function WatchSourcesEditor({ sources, onChange }: {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function PersonSearchInput({ value, onChange, results, placeholder, onPick }: {
-  value: string;
-  onChange: (v: string) => void;
-  results: Person[];
-  placeholder: string;
-  onPick: (p: Person) => void;
-}) {
-  return (
-    <div>
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-dark-500" />
-          <input
-            type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-            className="w-full pl-9 pr-3 py-2 rounded-md bg-dark-800 border border-dark-600 text-sm text-dark-200 placeholder:text-dark-500 focus:outline-none focus:border-primary-500/60 focus:ring-1 focus:ring-primary-500/20 transition-all"
-          />
-        </div>
-        <button type="button" onClick={() => {
-          const person = results[0];
-          if (person) onPick(person);
-        }}
-          className="px-3 py-2 rounded-md bg-primary-600 text-white text-xs font-medium hover:bg-primary-500 transition-colors flex items-center gap-1">
-          <Plus className="h-3.5 w-3.5" /> Add
-        </button>
-      </div>
-      <AnimatePresence>
-        {results.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-            className="mt-1.5 rounded-lg bg-dark-800 border border-dark-600 overflow-hidden shadow-xl">
-            {results.slice(0, 6).map(p => (
-              <button key={p.id} type="button" onClick={() => onPick(p)}
-                className="w-full px-3.5 py-2.5 text-sm text-left text-dark-200 hover:bg-dark-700 hover:text-white transition-colors flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-primary-600/15 flex items-center justify-center text-primary-400 text-[10px] font-bold">
-                  {p.name.charAt(0).toUpperCase()}
-                </div>
-                {p.name}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

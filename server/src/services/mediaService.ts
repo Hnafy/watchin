@@ -4,8 +4,6 @@ import {
   Country,
   Language,
   Keyword,
-  CastMember,
-  Director,
   Season,
   Episode,
   Rating,
@@ -26,6 +24,7 @@ import {
   mediaCountsMap,
 } from '../db/utils.js';
 import { AppError } from '../utils/AppError.js';
+import { sanitizePublicMedia, sanitizePublicMediaArray } from '../utils/mediaSerializer.js';
 
 interface SearchQuery {
   q?: string;
@@ -242,10 +241,7 @@ function relevanceCompare(a: any, b: any): number {
   return new Date(b.releaseDate || 0).getTime() - new Date(a.releaseDate || 0).getTime();
 }
 
-const MEDIA_POPULATE = [
-  { path: 'genres countries languages keywords' },
-  { path: 'cast', options: { sort: { order: 1 }, limit: 5 }, populate: { path: 'person' } },
-];
+const MEDIA_POPULATE = [{ path: 'genres countries languages keywords' }];
 
 async function computeFacets(q: SearchQuery): Promise<Omit<Facets, 'totalResults'>> {
   const filter = await buildBaseWhere(q);
@@ -318,7 +314,7 @@ async function computeFacets(q: SearchQuery): Promise<Omit<Facets, 'totalResults
 
 async function withMediaCounts(docs: any[]): Promise<any[]> {
   const counts = await mediaCountsMap(docs.map((d) => d._id));
-  return attachCountsToMedia(docs, counts);
+  return sanitizePublicMediaArray(attachCountsToMedia(docs, counts));
 }
 
 export const mediaService = {
@@ -373,15 +369,6 @@ export const mediaService = {
     const media = await Media.findById(id)
       .populate('genres countries languages keywords')
       .populate({
-        path: 'cast',
-        options: { sort: { order: 1 } },
-        populate: { path: 'person' },
-      })
-      .populate({
-        path: 'directors',
-        populate: { path: 'person' },
-      })
-      .populate({
         path: 'seasons',
         options: { sort: { seasonNumber: 1 } },
         populate: { path: 'episodes', options: { sort: { episodeNumber: 1 } } },
@@ -397,21 +384,12 @@ export const mediaService = {
     const counts = await mediaCountsMap([media._id]);
     const json = media.toJSON() as any;
     json._count = counts[json.id] || { ratings: 0, watchlistItems: 0 };
-    return json;
+    return sanitizePublicMedia(json);
   },
 
   async getMediaBySlug(slug: string) {
     const media = await Media.findOne({ slug })
       .populate('genres countries languages keywords')
-      .populate({
-        path: 'cast',
-        options: { sort: { order: 1 }, limit: 15 },
-        populate: { path: 'person' },
-      })
-      .populate({
-        path: 'directors',
-        populate: { path: 'person' },
-      })
       .populate({
         path: 'seasons',
         options: { sort: { seasonNumber: 1 } },
@@ -423,7 +401,7 @@ export const mediaService = {
     const counts = await mediaCountsMap([media._id]);
     const json = media.toJSON() as any;
     json._count = counts[json.id] || { ratings: 0, watchlistItems: 0 };
-    return json;
+    return sanitizePublicMedia(json);
   },
 
   async getTrending(period: string, limit: number, type?: string) {
@@ -440,7 +418,7 @@ export const mediaService = {
       if (!t.media) return null;
       const json = t.media.toJSON();
       json._count = counts[json.id] || { ratings: 0, watchlistItems: 0 };
-      return { ...json, trendingRank: t.rank, trendingScore: t.score };
+      return { ...sanitizePublicMedia(json), trendingRank: t.rank, trendingScore: t.score };
     }).filter(Boolean);
   },
 
@@ -535,12 +513,7 @@ export const mediaService = {
     let docs: any[];
     if (search && !query.sortBy) {
       const all = await Media.find(where)
-        .populate('genres countries languages')
-        .populate({
-          path: 'cast',
-          options: { sort: { order: 1 }, limit: 10 },
-          populate: { path: 'person' },
-        });
+        .populate('genres countries languages');
 
       const scored = all.map((d) => {
         const json: any = d.toJSON();
@@ -555,12 +528,7 @@ export const mediaService = {
         .sort(orderBy)
         .skip((page - 1) * limit)
         .limit(limit)
-        .populate('genres countries languages')
-        .populate({
-          path: 'cast',
-          options: { sort: { order: 1 }, limit: 10 },
-          populate: { path: 'person' },
-        });
+        .populate('genres countries languages');
     }
 
     const data = await withMediaCounts(docs);
@@ -623,29 +591,6 @@ export const mediaService = {
       languages: languages.map((l) => l._id),
       keywords: keywords.map((k) => k._id),
     });
-
-    if (data.cast?.length) {
-      for (const c of data.cast) {
-        if (!isValidId(c.personId)) continue;
-        await CastMember.create({
-          mediaId: media._id,
-          personId: c.personId,
-          character: c.character || null,
-          order: c.order || 0,
-        });
-      }
-    }
-
-    if (data.directors?.length) {
-      for (const d of data.directors) {
-        if (!isValidId(d.personId)) continue;
-        await Director.create({
-          mediaId: media._id,
-          personId: d.personId,
-          order: d.order || 0,
-        });
-      }
-    }
 
     if (data.seasons?.length && (data.type === 'TV_SHOW' || data.type === 'ANIME')) {
       for (const season of data.seasons) {
@@ -718,8 +663,6 @@ export const mediaService = {
 
     await Promise.all([
       Media.deleteOne({ _id: id }),
-      CastMember.deleteMany({ mediaId: id }),
-      Director.deleteMany({ mediaId: id }),
       Season.deleteMany({ mediaId: id }),
       Episode.deleteMany({ mediaId: id }),
       Rating.deleteMany({ mediaId: id }),
@@ -761,12 +704,7 @@ export const mediaService = {
     const docs = await Media.find(where)
       .sort({ popularity: -1 })
       .limit(limit)
-      .populate('genres countries languages')
-      .populate({
-        path: 'cast',
-        options: { sort: { order: 1 }, limit: 3 },
-        populate: { path: 'person' },
-      });
+      .populate('genres countries languages');
 
     return withMediaCounts(docs);
   },
@@ -831,8 +769,41 @@ export const mediaService = {
       if (json.media && counts[json.media.id]) {
         json.media._count = counts[json.media.id];
       }
+      if (json.media) {
+        json.media = sanitizePublicMedia(json.media);
+      }
       return json;
     });
+  },
+
+  /**
+   * Returns the real video sources for a media item or a specific episode.
+   * Only reachable by authenticated users — this is where protected links live.
+   */
+  async getWatchSource(id: string, episodeId?: string) {
+    const media = await Media.findById(id);
+    if (!media) throw AppError.notFound('Media not found');
+
+    if (episodeId) {
+      const episode = await Episode.findOne({ _id: episodeId, mediaId: media._id });
+      if (!episode) throw AppError.notFound('Episode not found');
+      return {
+        mediaId: media.id,
+        episodeId: episode.id,
+        title: media.title,
+        watchUrl: episode.watchUrl || null,
+        sources: episode.sources || [],
+        hasWatchSource: Boolean(episode.watchUrl || (episode.sources?.length > 0)),
+      };
+    }
+
+    return {
+      mediaId: media.id,
+      title: media.title,
+      watchUrl: media.watchUrl || null,
+      sources: media.sources || [],
+      hasWatchSource: Boolean(media.watchUrl || (media.sources?.length > 0)),
+    };
   },
 
   async getLanguages() {

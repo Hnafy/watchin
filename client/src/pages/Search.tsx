@@ -5,7 +5,7 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 import { mediaApi } from '../services/api';
 import { MediaCard } from '../components/media/MediaCard';
-import { Search as SearchIcon, X, ChevronLeft, ChevronRight, Mic, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Search as SearchIcon, X, ChevronLeft, ChevronRight, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { SearchFilters, SearchResult, Media, Genre, Country, Language } from '../types';
 import { FilterPopover } from '../components/search/FilterPopover';
 import { useI18n } from '../i18n/LanguageProvider';
@@ -96,7 +96,6 @@ export function Search() {
   const [debouncedQuery, setDebouncedQuery] = useState(searchParams.get('q') || '');
   const [filters, setFilters] = useState<SearchFilters>(() => paramsToFilters(searchParams));
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [listening, setListening] = useState(false);
 
    const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -203,31 +202,11 @@ export function Search() {
     setFilters((prev) => ({ ...removeChip(prev, chip), page: 1 }));
   }, []);
 
-  const handleRemoveQuery = useCallback(() => {
-    setQuery('');
-    setDebouncedQuery('');
-    setFilters((prev) => ({ ...prev, page: 1 }));
-  }, []);
-
   const handlePageChange = useCallback((page: number) => {
     setFilters((prev) => ({ ...prev, page }));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  const handleVoice = useCallback(() => {
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRec) return;
-    const rec = new SpeechRec();
-    rec.lang = 'en-US';
-    rec.interimResults = false;
-    rec.onstart = () => setListening(true);
-    rec.onend = () => setListening(false);
-    rec.onresult = (e: any) => {
-      const text = e.results?.[0]?.[0]?.transcript || '';
-      setQuery(text);
-    };
-    rec.start();
-  }, []);
 
   const hasAnyActive = activeChips.length > 0 || !!debouncedQuery;
 
@@ -257,18 +236,7 @@ export function Search() {
               autoFocus
               className="w-full bg-transparent py-4 pl-12 pr-28 text-base text-white placeholder:text-dark-400 focus:outline-none"
             />
-            <div className="absolute right-2 flex items-center gap-1">
-              <button
-                onClick={handleVoice}
-                aria-label={t('search.voiceSearch')}
-                className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${
-                  listening
-                    ? 'animate-pulse bg-primary-600 text-white'
-                    : 'text-dark-400 hover:bg-white/[0.08] hover:text-white'
-                }`}
-              >
-                <Mic className="h-4 w-4" />
-              </button>
+<div className="absolute right-2 flex items-center gap-1">
               <button
                 onClick={() => setFiltersOpen(true)}
                 className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition-all ${
@@ -279,23 +247,9 @@ export function Search() {
               >
                 <SlidersHorizontal className="h-4 w-4" /> {t('search.filters')}{activeChips.length > 0 ? ` (${activeChips.length})` : ''}
               </button>
-              {query && (
-                <button onClick={handleRemoveQuery} aria-label="Clear"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-dark-400 transition-colors hover:bg-white/[0.08] hover:text-white">
-                  <X className="h-4 w-4" />
-                </button>
-              )}
             </div>
-          </div>
-          {listening && (
-            <p className="mt-2 flex items-center gap-2 text-xs text-primary-400">
-              <span className="h-1.5 w-1.5 animate-ping rounded-full bg-primary-500" /> {t('search.listening')}
-            </p>
-          )}
-
-          {/* Filter popover */}
-          <FilterPopover open={filtersOpen} onClose={() => setFiltersOpen(false)} onApply={handleApplyFilters} filters={filters} />
-        </motion.div>
+</div>
+            </motion.div>
 
         {/* Active filter chips */}
         <AnimatePresence>

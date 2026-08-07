@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { userApi } from '../services/api';
 import { useSettings } from '../hooks/useSettings';
+import { useI18n } from '../i18n/LanguageProvider';
+import { LanguageSwitcher } from '../components/ui/LanguageSwitcher';
 import {
-  User, Lock, Bell, Eye, AlertTriangle,
+  User, Lock, Bell, AlertTriangle, Globe,
   Save, Loader2, Trash2, ShieldAlert,
 } from 'lucide-react';
 import { AvatarUploader } from '../components/ui/AvatarUploader';
@@ -13,22 +15,23 @@ import { SettingsRow } from '../components/ui/SettingsRow';
 import { Toggle } from '../components/ui/Toggle';
 import toast from 'react-hot-toast';
 
-type Tab = 'account' | 'privacy' | 'notifications' | 'danger';
-
-const tabs: { id: Tab; icon: typeof User; label: string }[] = [
-  { id: 'account', icon: User, label: 'Account' },
-  { id: 'privacy', icon: Eye, label: 'Privacy' },
-  { id: 'notifications', icon: Bell, label: 'Notifications' },
-  { id: 'danger', icon: AlertTriangle, label: 'Danger Zone' },
-];
+type Tab = 'account' | 'notifications' | 'preferences' | 'danger';
 
 export function Settings() {
   const { user, setUser, logout } = useAuth();
   const { settings, update, isSaving } = useSettings();
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<Tab>('account');
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const tabs: { id: Tab; icon: typeof User; label: string }[] = [
+    { id: 'account', icon: User, label: t('settings.account') },
+    { id: 'notifications', icon: Bell, label: t('settings.notifications') },
+    { id: 'preferences', icon: Globe, label: t('settings.preferences') },
+    { id: 'danger', icon: AlertTriangle, label: t('settings.danger') },
+  ];
 
   const handleProfileSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -39,9 +42,9 @@ export function Settings() {
     try {
       const res = await userApi.updateProfile({ username, email });
       setUser(res.data.data);
-      toast.success('Profile updated successfully');
+      toast.success(t('settings.profileUpdated'));
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Update failed');
+      toast.error(err.response?.data?.message || t('settings.updateFailed'));
     } finally {
       setSavingProfile(false);
     }
@@ -53,31 +56,29 @@ export function Settings() {
     const currentPassword = fd.get('currentPassword') as string;
     const newPassword = fd.get('newPassword') as string;
     const confirmPassword = fd.get('confirmPassword') as string;
-    if (newPassword !== confirmPassword) { toast.error('Passwords do not match'); return; }
+    if (newPassword !== confirmPassword) { toast.error(t('settings.passwordsMismatch')); return; }
     setSavingPassword(true);
     try {
       await userApi.changePassword({ currentPassword, newPassword });
-      toast.success('Password updated successfully');
+      toast.success(t('settings.passwordUpdated'));
       (e.target as HTMLFormElement).reset();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Update failed');
+      toast.error(err.response?.data?.message || t('settings.updateFailed'));
     } finally {
       setSavingPassword(false);
     }
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      'This will permanently delete your account, watch history, watchlist, and ratings. This cannot be undone. Continue?'
-    );
+    const confirmed = window.confirm(t('settings.deleteAccountConfirm'));
     if (!confirmed) return;
     setDeleting(true);
     try {
       await userApi.deleteAccount();
-      toast.success('Account deleted');
+      toast.success(t('settings.accountDeleted'));
       await logout();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to delete account');
+      toast.error(err.response?.data?.message || t('settings.deleteFailed'));
       setDeleting(false);
     }
   };
@@ -87,11 +88,11 @@ export function Settings() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-3xl font-black">
-            Settings
+            {t('settings.title')}
           </motion.h1>
           {isSaving && (
             <span className="flex items-center gap-2 text-sm text-dark-400">
-              <Loader2 className="h-4 w-4 animate-spin text-primary-400" /> Saving...
+              <Loader2 className="h-4 w-4 animate-spin text-primary-400" /> {t('settings.saving')}
             </span>
           )}
         </div>
@@ -131,7 +132,7 @@ export function Settings() {
                 {/* -------------------- ACCOUNT -------------------- */}
                 {activeTab === 'account' && (
                   <>
-                    <SettingCard icon={User} title="Profile" description="Your public identity on Watchin">
+                    <SettingCard icon={User} title={t('settings.profile')} description={t('settings.profileDesc')}>
                       <div className="flex items-center gap-4 px-5 py-4">
                         <AvatarUploader size="lg" />
                         <div>
@@ -144,89 +145,82 @@ export function Settings() {
                       </div>
                       <form onSubmit={handleProfileSave} className="space-y-4 px-5 py-5">
                         <div>
-                          <label className="label">Username</label>
+                          <label className="label">{t('settings.username')}</label>
                           <input name="username" defaultValue={user?.username} required minLength={3}
                             className="input" />
                         </div>
                         <div>
-                          <label className="label">Email</label>
+                          <label className="label">{t('settings.email')}</label>
                           <input name="email" type="email" defaultValue={user?.email} required
                             className="input" />
                         </div>
                         <button type="submit" disabled={savingProfile} className="btn-primary">
                           {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                          Save Changes
+                          {t('settings.saveChanges')}
                         </button>
                       </form>
                     </SettingCard>
 
-                    <SettingCard icon={Lock} title="Security" description="Keep your account safe" index={1}>
+                    <SettingCard icon={Lock} title={t('settings.security')} description={t('settings.securityDesc')} index={1}>
                       <form onSubmit={handlePasswordChange} className="space-y-4 px-5 py-5">
                         <div>
-                          <label className="label">Current Password</label>
+                          <label className="label">{t('settings.currentPassword')}</label>
                           <input name="currentPassword" type="password" required className="input" />
                         </div>
                         <div>
-                          <label className="label">New Password</label>
+                          <label className="label">{t('settings.newPassword')}</label>
                           <input name="newPassword" type="password" required minLength={8} className="input" />
                         </div>
                         <div>
-                          <label className="label">Confirm New Password</label>
+                          <label className="label">{t('settings.confirmPassword')}</label>
                           <input name="confirmPassword" type="password" required minLength={8} className="input" />
                         </div>
                         <button type="submit" disabled={savingPassword} className="btn-primary">
                           {savingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                          Update Password
+                          {t('settings.updatePassword')}
                         </button>
                       </form>
                     </SettingCard>
                   </>
                 )}
 
-                {/* -------------------- PRIVACY -------------------- */}
-                {activeTab === 'privacy' && (
-                  <SettingCard icon={Eye} title="Privacy" description="Control who can see your activity">
+
+                {/* -------------------- NOTIFICATIONS -------------------- */}
+                {activeTab === 'notifications' && (
+                  <SettingCard icon={Bell} title={t('settings.notifications')} description={t('settings.notificationsDesc')}>
                     <SettingsRow
-                      title="Public profile"
-                      description="Allow other users to view your profile page"
-                      control={<Toggle checked={settings.privacy.publicProfile} onChange={(v) => update({ privacy: { ...settings.privacy, publicProfile: v } })} label="Public profile" />}
+                      title={t('settings.emailUpdates')}
+                      description={t('settings.emailUpdatesDesc')}
+                      control={<Toggle checked={settings.notifications.emailUpdates} onChange={(v) => update({ notifications: { ...settings.notifications, emailUpdates: v } })} label={t('settings.emailUpdates')} />}
                     />
                     <SettingsRow
-                      title="Show watch history"
-                      description="Display your recent watch activity on your profile"
-                      control={<Toggle checked={settings.privacy.showWatchHistory} onChange={(v) => update({ privacy: { ...settings.privacy, showWatchHistory: v } })} label="Show watch history" />}
+                      title={t('settings.newReleases')}
+                      description={t('settings.newReleasesDesc')}
+                      control={<Toggle checked={settings.notifications.newReleases} onChange={(v) => update({ notifications: { ...settings.notifications, newReleases: v } })} label={t('settings.newReleases')} />}
                     />
                     <SettingsRow
-                      title="Show stats & achievements"
-                      description="Display your stats, badges, and activity heatmap"
-                      control={<Toggle checked={settings.privacy.showStats} onChange={(v) => update({ privacy: { ...settings.privacy, showStats: v } })} label="Show stats & achievements" />}
+                      title={t('settings.watchlistUpdates')}
+                      description={t('settings.watchlistUpdatesDesc')}
+                      control={<Toggle checked={settings.notifications.watchlist} onChange={(v) => update({ notifications: { ...settings.notifications, watchlist: v } })} label={t('settings.watchlistUpdates')} />}
+                    />
+                    <SettingsRow
+                      title={t('settings.commentsReplies')}
+                      description={t('settings.commentsRepliesDesc')}
+                      control={<Toggle checked={settings.notifications.comments} onChange={(v) => update({ notifications: { ...settings.notifications, comments: v } })} label={t('settings.commentsReplies')} />}
                     />
                   </SettingCard>
                 )}
 
-                {/* -------------------- NOTIFICATIONS -------------------- */}
-                {activeTab === 'notifications' && (
-                  <SettingCard icon={Bell} title="Notifications" description="Choose what you want to be notified about">
-                    <SettingsRow
-                      title="Email updates"
-                      description="Product news, features, and occasional updates"
-                      control={<Toggle checked={settings.notifications.emailUpdates} onChange={(v) => update({ notifications: { ...settings.notifications, emailUpdates: v } })} label="Email updates" />}
-                    />
-                    <SettingsRow
-                      title="New releases"
-                      description="Get notified when new movies and shows are added"
-                      control={<Toggle checked={settings.notifications.newReleases} onChange={(v) => update({ notifications: { ...settings.notifications, newReleases: v } })} label="New releases" />}
-                    />
-                    <SettingsRow
-                      title="Watchlist updates"
-                      description="Updates about titles in your list"
-                      control={<Toggle checked={settings.notifications.watchlist} onChange={(v) => update({ notifications: { ...settings.notifications, watchlist: v } })} label="Watchlist updates" />}
-                    />
-                    <SettingsRow
-                      title="Comments & replies"
-                      description="When someone comments or replies to you"
-                      control={<Toggle checked={settings.notifications.comments} onChange={(v) => update({ notifications: { ...settings.notifications, comments: v } })} label="Comments & replies" />}
-                    />
+                {/* -------------------- PREFERENCES -------------------- */}
+                {activeTab === 'preferences' && (
+                  <SettingCard icon={Globe} title={t('settings.preferences')} description={t('settings.languageDesc')}>
+                    <div className="flex items-center justify-between px-5 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-white">{t('settings.language')}</p>
+                        <p className="mt-0.5 text-xs text-dark-400">{t('settings.languageDesc')}</p>
+                      </div>
+                      <LanguageSwitcher />
+                    </div>
                   </SettingCard>
                 )}
 
@@ -242,16 +236,16 @@ export function Settings() {
                         <ShieldAlert className="h-[18px] w-[18px]" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-white">Danger Zone</h3>
-                        <p className="text-xs text-dark-400">Irreversible actions</p>
+                        <h3 className="text-sm font-bold text-white">{t('settings.dangerTitle')}</h3>
+                        <p className="text-xs text-dark-400">{t('settings.dangerDesc')}</p>
                       </div>
                     </header>
                     <div className="divide-y divide-white/[0.04]">
                       <div className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <p className="text-sm font-medium text-white">Delete account</p>
+                          <p className="text-sm font-medium text-white">{t('settings.deleteAccount')}</p>
                           <p className="mt-0.5 text-xs leading-relaxed text-dark-400">
-                            Permanently removes your account, watch history, watchlist, and ratings.
+                            {t('settings.deleteAccountDesc')}
                           </p>
                         </div>
                         <button
@@ -260,7 +254,7 @@ export function Settings() {
                           className="btn shrink-0 border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white disabled:opacity-50"
                         >
                           {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                          Delete Account
+                          {t('settings.deleteAccountBtn')}
                         </button>
                       </div>
                     </div>

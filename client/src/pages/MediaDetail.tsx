@@ -760,7 +760,7 @@ structuredData={
                 transition={{ delay: 0.65, duration: 0.6, ease }}
                 className="mt-8 flex flex-wrap items-center gap-3"
               >
-                {media.watchUrl && (
+                {media.hasWatchSource && (
                   <motion.button
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
@@ -1061,7 +1061,7 @@ structuredData={
                 <EpisodeSelector
                   seasons={media.seasons}
                   mediaId={media.id}
-                  onSelectEpisode={(watchUrl, episodeNumber, seasonNumber) => {
+                  onSelectEpisode={(episodeNumber, seasonNumber) => {
                     navigate(
                       `/watch/${media.id}?season=${seasonNumber}&episode=${episodeNumber}`,
                     );

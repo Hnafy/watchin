@@ -6,11 +6,8 @@ import {
   Keyword,
   Season,
   Episode,
-  CastMember,
-  Director,
   AdminMediaInput,
   User,
-  isValidId,
 } from '../db/models.js';
 import {
   slugify,
@@ -357,29 +354,6 @@ export const adminService = {
     if (Array.isArray(input.keywords) && input.keywords.length) {
       const keywords = await Promise.all(input.keywords.map((name: string) => ensureKeyword(name)));
       await Media.updateOne({ _id: media._id }, { $set: { keywords: keywords.map((k) => k._id) } });
-    }
-
-    if (Array.isArray(input.cast) && input.cast.length) {
-      for (const c of input.cast) {
-        if (!isValidId(c.personId)) continue;
-        await CastMember.create({
-          mediaId: media._id,
-          personId: c.personId,
-          character: c.character || null,
-          order: c.order || 0,
-        });
-      }
-    }
-
-    if (Array.isArray(input.directors) && input.directors.length) {
-      for (const d of input.directors) {
-        if (!isValidId(d.personId)) continue;
-        await Director.create({
-          mediaId: media._id,
-          personId: d.personId,
-          order: d.order || 0,
-        });
-      }
     }
 
     if (Array.isArray(input.seasons) && input.seasons.length && (input.type === 'TV_SHOW' || input.type === 'ANIME')) {

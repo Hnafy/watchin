@@ -10,7 +10,9 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   
   db: {
-    url: process.env.MONGODB_URI || 'mongodb+srv://abdallahalfeky18_db_user:YZ2rhhJaDdSgXOMQ@watchin.rmxdal3.mongodb.net',
+    // Production credentials are provided via MONGODB_URI. The localhost
+    // fallback only covers local development and contains no secrets.
+    url: process.env.MONGODB_URI || 'mongodb://localhost:27017/streaming',
   },
   
   jwt: {
@@ -59,9 +61,35 @@ export const config = {
     pass: process.env.SMTP_PASS,
     from: process.env.EMAIL_FROM,
   },
+
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+  },
   
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
+  },
+
+  discord: {
+    supportWebhook: process.env.DISCORD_WEBHOOK_URL || '',
+    reportWebhook: process.env.DISCORD_REPORT_WEBHOOK_URL || '',
+    username: 'Watchin Bot',
+  },
+
+  stream: {
+    // Used to sign watch-source responses. Falls back to the JWT access
+    // secret so it works out of the box in every environment.
+    signingSecret: process.env.STREAM_SIGNING_SECRET || process.env.JWT_ACCESS_SECRET || '',
+    tokenTtlSec: 60 * 60,
+  },
+
+  comments: {
+    defaultEnabled: true,
+    defaultAiModeration: true,
+    defaultProfanityFilter: true,
+    defaultRequireVerifiedEmail: true,
+    defaultReportThreshold: 3,
+    defaultMaxLength: 2000,
   },
 
   mixdrop: {

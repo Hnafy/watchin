@@ -33,11 +33,23 @@ export const useAuth = () => {
   });
 
   const registerMutation = useMutation({
-    mutationFn: (data: { email: string; username: string; password: string }) => authApi.register(data),
+    mutationFn: (data: { email: string; username: string; password: string; code: string }) => authApi.register(data),
     onSuccess: (r) => {
       setTokens(r.data.accessToken, r.data.refreshToken);
       useAuthStore.getState().setUser(r.data.user);
     },
+  });
+
+  const googleMutation = useMutation({
+    mutationFn: (idToken: string) => authApi.googleLogin(idToken),
+    onSuccess: (r) => {
+      setTokens(r.data.accessToken, r.data.refreshToken);
+      useAuthStore.getState().setUser(r.data.user);
+    },
+  });
+
+  const sendVerificationMutation = useMutation({
+    mutationFn: (email: string) => authApi.sendVerification(email),
   });
 
   const logoutMutation = useMutation({
@@ -52,7 +64,11 @@ export const useAuth = () => {
   return {
     user: user || null, isAuthenticated, isLoading, setUser,
     login: loginMutation.mutateAsync, register: registerMutation.mutateAsync,
+    googleLogin: googleMutation.mutateAsync,
+    sendVerificationCode: sendVerificationMutation.mutateAsync,
     logout: logoutMutation.mutateAsync,
     isLoggingIn: loginMutation.isPending, isRegistering: registerMutation.isPending,
+    isGoogleLoggingIn: googleMutation.isPending,
+    isSendingCode: sendVerificationMutation.isPending,
   };
 };

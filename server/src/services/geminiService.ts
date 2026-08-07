@@ -107,4 +107,45 @@ Return a JSON array of objects with exactly these fields: title, reason (why the
       return null;
     }
   },
+
+  /**
+   * AI comment moderation. Returns `{ isInappropriate, reason }` or null when
+   * Gemini is unavailable or the call fails (callers must fall back gracefully).
+   */
+  async moderateContent(content: string) {
+    if (!config.gemini.apiKey || !model) {
+      init();
+      if (!model) return null;
+    }
+
+    const prompt = `You are a strict community content moderator for a streaming website.
+Decide whether the following user comment is inappropriate and should be hidden.
+
+Rules:
+- Flag as inappropriate: hate speech, harassment, threats, explicit sexual content, spam/scam links, or personal attacks.
+- Approve: normal discussion, opinions, mild disagreement, or playful language.
+- Do NOT flag criticism of movies/shows or mild profanity alone.
+
+Comment:
+"""${content.slice(0, 2000)}"""
+
+Return ONLY valid JSON with exactly two fields: isInappropriate (boolean) and reason (short string, max 12 words). No markdown, no explanation.`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const clean = text.replace(/```json\s*/i, '').replace(/```\s*$/, '').trim();
+      const parsed = JSON.parse(clean);
+      if (typeof parsed?.isInappropriate === 'boolean') {
+        return {
+          isInappropriate: parsed.isInappropriate,
+          reason: typeof parsed.reason === 'string' ? parsed.reason : 'AI flagged',
+        };
+      }
+      return null;
+    } catch (err) {
+      console.error('Gemini moderation error:', err);
+      return null;
+    }
+  },
 };

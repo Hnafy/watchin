@@ -17,12 +17,10 @@
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "deploy:firebase": "npm run build:client && firebase deploy"
+    "docker:down": "docker-compose down"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "firebase-tools": "^15.26.0"
+    "concurrently": "^8.2.2"
   },
   "engines": {
     "node": ">=20.0.0"

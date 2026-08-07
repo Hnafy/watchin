@@ -37,6 +37,7 @@ services:
       - /app/node_modules
     environment:
       - VITE_API_PROXY_TARGET=http://server:4000
+      - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID:-}
     depends_on:
       - server
 
@@ -51,16 +52,25 @@ services:
       - ./server:/app
       - /app/node_modules
     environment:
-      - MONGODB_URI=mongodb://mongo:27017/streaming
-      - REDIS_URL=redis://redis:6379
-      - NODE_ENV=development
-      - JWT_ACCESS_SECRET=your-super-secret-access-key-change-in-production-min-32-chars
-      - JWT_REFRESH_SECRET=your-super-secret-refresh-key-change-in-production-min-32-chars
-      - CLIENT_URL=http://localhost:5173
-      - TMDB_API_KEY=1a68b0b3695c7a1b3d40e733f9216c0f
-      - MIXDROP_EMAIL=abdallahalfeky18@gmail.com
-      - MIXDROP_KEY=4EVGd13ASvIzitK4RW
-      - IMGBB_API_KEY=b862099c9905e0f993edfc8a7c011e95
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongo:27017/streaming}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - NODE_ENV=${NODE_ENV:-development}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set in .env}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set in .env}
+      - CLIENT_URL=${CLIENT_URL:-http://localhost:5173}
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - MIXDROP_EMAIL=${MIXDROP_EMAIL:-}
+      - MIXDROP_KEY=${MIXDROP_KEY:-}
+      - IMGBB_API_KEY=${IMGBB_API_KEY:-}
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
+      - DISCORD_REPORT_WEBHOOK_URL=${DISCORD_REPORT_WEBHOOK_URL:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - EMAIL_FROM=${EMAIL_FROM:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
     depends_on:
       mongo:
         condition: service_healthy

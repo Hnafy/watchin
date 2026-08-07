@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import compression from 'compression';
 import { config } from './config/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorMiddleware.js';
 import { requestLogger } from './middleware/requestLogger.js';
@@ -20,7 +21,7 @@ import recommendationRoutes from './routes/recommendationRoutes.js';
 import adsRoutes from './routes/adsRoutes.js';
 import mixdropRoutes from './routes/mixdropRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
-import playlistRoutes from './routes/playlistRoutes.js';
+import supportRoutes from './routes/supportRoutes.js';
 
 const app = express();
 
@@ -75,6 +76,7 @@ app.use(helmet({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(compression());
 app.use(requestLogger);
 
 const limiter = rateLimit({
@@ -111,7 +113,7 @@ app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/mixdrop', mixdropRoutes);
 app.use('/api/comments', commentRoutes);
-app.use('/api/playlists', playlistRoutes);
+app.use('/api/support', supportRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

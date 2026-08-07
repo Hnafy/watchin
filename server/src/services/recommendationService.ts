@@ -1,35 +1,22 @@
-import { Media, CastMember, WatchHistory, WatchlistItem, Rating, TrendingMedia } from '../db/models.js';
+import { Media, WatchHistory, WatchlistItem, Rating, TrendingMedia } from '../db/models.js';
 
 export const recommendationService = {
   async getSimilarMedia(mediaId: string) {
-    const media = await Media.findById(mediaId).populate('genres').populate({
-      path: 'cast',
-      options: { limit: 5 },
-      populate: { path: 'person' },
-    });
+    const media = await Media.findById(mediaId).populate('genres');
 
     if (!media) return [];
 
     const m: any = media;
     const genreIds = (m.genres || []).map((g: any) => g._id);
-    const castPersonIds = (m.cast || []).map((c: any) => c.personId);
-
-    const castMediaIds = await CastMember.find({ personId: { $in: castPersonIds } }).distinct('mediaId');
 
     const similar = await Media.find({
       _id: { $ne: media._id },
       status: 'RELEASED',
       $or: [
         { genres: { $in: genreIds } },
-        { _id: { $in: castMediaIds } },
       ],
     })
       .populate('genres')
-      .populate({
-        path: 'cast',
-        match: { personId: { $in: castPersonIds } },
-        populate: { path: 'person', select: 'name' },
-      })
       .limit(50);
 
     const recommendations = similar.map((item: any) => {
@@ -39,22 +26,17 @@ export const recommendationService = {
       ).length;
       score += sharedGenres * 10;
 
-      const sharedCast = (item.cast || []).length;
-      score += sharedCast * 15;
-
       score += (item.imdbRating || 0) * 2;
       score += Math.log(item.viewCount + 1) * 5;
 
-      return { media: item, score, reason: this.getReason(sharedGenres, sharedCast) };
+      return { media: item, score, reason: this.getReason(sharedGenres) };
     });
 
     recommendations.sort((a, b) => b.score - a.score);
     return recommendations.slice(0, 20);
   },
 
-  getReason(sharedGenres: number, sharedCast: number): string {
-    if (sharedCast > 0 && sharedGenres > 0) return `Shares ${sharedCast} cast member${sharedCast > 1 ? 's' : ''} and ${sharedGenres} genre${sharedGenres > 1 ? 's' : ''}`;
-    if (sharedCast > 0) return `Features ${sharedCast} shared cast member${sharedCast > 1 ? 's' : ''}`;
+  getReason(sharedGenres: number): string {
     if (sharedGenres > 0) return `Similar genres (${sharedGenres} match${sharedGenres > 1 ? 'es' : ''})`;
     return 'Popular in your region';
   },

@@ -30,10 +30,22 @@ router.post('/media/:id/reject', adminController.rejectMedia);
 // User Management
 router.get('/users', adminController.getAllUsers);
 router.patch('/users/:id/role', adminController.updateUserRole);
+router.patch('/users/:id/verify', adminController.updateUserVerified);
+router.post('/users/:id/message', adminController.sendUserMessage);
+router.post('/users/:id/warn', adminController.warnUser);
 router.delete('/users/:id', adminController.deleteUser);
+
+// Blocked Emails
+router.get('/blocked-emails', adminController.getBlockedEmails);
+router.post('/blocked-emails', adminController.addBlockedEmail);
+router.delete('/blocked-emails/:id', adminController.removeBlockedEmail);
 
 // Comment Moderation
 router.get('/comments', adminController.getAllComments);
+router.get('/comments/settings', adminController.getCommentSettings);
+router.put('/comments/settings', adminController.updateCommentSettings);
+router.patch('/comments/:id/hidden', adminController.setCommentHidden);
+router.post('/comments/:id/warn-reporters', adminController.warnCommentReporters);
 router.delete('/comments/:id', adminController.deleteComment);
 
 // Series Management (direct creation with seasons/episodes)

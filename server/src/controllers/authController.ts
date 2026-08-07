@@ -18,6 +18,33 @@ export const authController = {
     }
   },
 
+  async sendVerificationCode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { devCode } = await authService.sendVerificationCode(req.body);
+      res.json({
+        status: 'success',
+        message: 'Verification code sent',
+        devCode,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async googleLogin(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { user, accessToken, refreshToken } = await authService.googleLogin(req.body.idToken);
+      res.json({
+        status: 'success',
+        user: { id: user.id, email: user.email, username: user.username, role: user.role, avatar: user.avatar },
+        accessToken,
+        refreshToken,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async login(req: Request, res: Response, next: NextFunction) {
     try {
       const { user, accessToken, refreshToken } = await authService.login(req.body);

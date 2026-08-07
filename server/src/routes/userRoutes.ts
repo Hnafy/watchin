@@ -7,9 +7,6 @@ import {
   changePasswordSchema,
   avatarSchema,
   userSettingsSchema,
-  friendRequestSchema,
-  followSchema,
-  profileLikeSchema,
   searchUsersQuerySchema,
 } from '../utils/validators.js';
 
@@ -28,19 +25,5 @@ router.get('/stats', userController.getStats);
 router.get('/settings', userController.getSettings);
 router.patch('/settings', validate(userSettingsSchema), userController.updateSettings);
 router.delete('/account', userController.deleteAccount);
-
-// Friend requests
-router.post('/friend-requests', validate(friendRequestSchema), userController.sendFriendRequest);
-router.patch('/friend-requests/:requestId/respond', userController.respondFriendRequest);
-router.delete('/friend-requests/:requestId/cancel', userController.cancelFriendRequest);
-router.delete('/friends', userController.removeFriend);
-router.get('/friends/:username', userController.getUserFriends);
-
-// Follows
-router.post('/follow', validate(followSchema), userController.toggleFollow);
-router.get('/follow-stats', userController.getFollowStats);
-
-// Profile likes
-router.post('/like-profile', validate(profileLikeSchema), userController.toggleProfileLike);
 
 export default router;

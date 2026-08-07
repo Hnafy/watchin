@@ -1,4 +1,4 @@
-import { User, Genre, Country, Language, Media, TrendingMedia, Person, CastMember } from './db/models.js';
+import { User, Genre, Country, Language, Media, TrendingMedia } from './db/models.js';
 import { connectDB, disconnectDB } from './db/index.js';
 
 async function main() {
@@ -243,84 +243,111 @@ async function main() {
       countries: ['US'],
       languages: ['en'],
     },
+    {
+      title: 'Naruto: Shippuden',
+      slug: 'naruto-shippuden',
+      type: 'ANIME',
+      status: 'RELEASED',
+      releaseDate: new Date('2007-02-15'),
+      overview:
+        'Two and a half years after leaving the village, Naruto Uzumaki returns to become the ninja he has always dreamed of being.',
+      posterUrl: 'https://image.tmdb.org/t/p/w500/zAYRe2bJxpWTVrwwmBc00VFkAf6.jpg',
+      backdropUrl: 'https://image.tmdb.org/t/p/w1280/zgnWuwNmXqDDtDIOV0swcLtRY3M.jpg',
+      genres: ['Action', 'Adventure', 'Animation'],
+      countries: ['JP'],
+      languages: ['ja'],
+    },
+    {
+      title: 'Attack on Titan',
+      slug: 'attack-on-titan',
+      type: 'ANIME',
+      status: 'RELEASED',
+      releaseDate: new Date('2013-04-07'),
+      overview:
+        'In a world where humanity lives behind walls to keep out giant man-eating titans, young Eren Yeager vows to exterminate every single one of them.',
+      posterUrl: 'https://image.tmdb.org/t/p/w500/hTP1DtLGFamjfu8WqjnuQdZX1wu.jpg',
+      backdropUrl: 'https://image.tmdb.org/t/p/w1280/fQl3BNv3eqwyzbRj4y4s2M2XKqf.jpg',
+      genres: ['Action', 'Fantasy', 'Animation'],
+      countries: ['JP'],
+      languages: ['ja'],
+    },
+    {
+      title: 'Demon Slayer: Kimetsu no Yaiba',
+      slug: 'demon-slayer-kimetsu-no-yaiba',
+      type: 'ANIME',
+      status: 'RELEASED',
+      releaseDate: new Date('2019-04-06'),
+      overview:
+        'A boy raised by demons and a young girl who refuses to give up her humanity fight back against the forces of evil.',
+      posterUrl: 'https://image.tmdb.org/t/p/w500/xUfRZu2exhuHUWAX9rrpUGaTOd5.jpg',
+      backdropUrl: 'https://image.tmdb.org/t/p/w1280/vTALV4gWrZgCX0mOksDdJjIJOI.jpg',
+      genres: ['Action', 'Fantasy', 'Animation'],
+      countries: ['JP'],
+      languages: ['ja'],
+    },
+    {
+      title: 'One Punch Man',
+      slug: 'one-punch-man',
+      type: 'ANIME',
+      status: 'RELEASED',
+      releaseDate: new Date('2015-10-05'),
+      overview:
+        'Saitama became a hero for fun, only to discover that he is so powerful that no enemy can defeat him — and it is driving him crazy.',
+      posterUrl: 'https://image.tmdb.org/t/p/w500/pGxZ7nUPn6EQwA8mDcXRQSPgFVt.jpg',
+      backdropUrl: 'https://image.tmdb.org/t/p/w1280/cTqI0Lepf1f9e9WdDIeCsOMb7lS.jpg',
+      genres: ['Action', 'Comedy', 'Animation'],
+      countries: ['JP'],
+      languages: ['ja'],
+    },
+    {
+      title: 'My Hero Academia',
+      slug: 'my-hero-academia',
+      type: 'ANIME',
+      status: 'RELEASED',
+      releaseDate: new Date('2016-04-03'),
+      overview:
+        'In a world where almost everyone has superpowers called Quirks, a quirkless boy dreams of becoming the greatest hero of all.',
+      posterUrl: 'https://image.tmdb.org/t/p/w500/saK7GkIkK0LLa9m3y5RVf3B9Olf.jpg',
+      backdropUrl: 'https://image.tmdb.org/t/p/w1280/zxBYX2dIL9Kv8LFFp1Y6n4GUkX2.jpg',
+      genres: ['Action', 'Adventure', 'Animation'],
+      countries: ['JP'],
+      languages: ['ja'],
+    },
+    {
+      title: 'Death Note',
+      slug: 'death-note',
+      type: 'ANIME',
+      status: 'RELEASED',
+      releaseDate: new Date('2006-10-04'),
+      overview:
+        'A brilliant high school student discovers a supernatural notebook that allows him to kill anyone by writing their name in it.',
+      posterUrl: 'https://image.tmdb.org/t/p/w500/qnqHAq0iQhW0x7eX8rE4KUg1e4e.jpg',
+      backdropUrl: 'https://image.tmdb.org/t/p/w1280/qA2x2xw2f2tZ8jWnUwXlEaYlNnD.jpg',
+      genres: ['Mystery', 'Drama', 'Animation'],
+      countries: ['JP'],
+      languages: ['ja'],
+    },
   ];
 
   for (const m of sampleMedia) {
-    const existing = await Media.findOne({ slug: m.slug });
-    if (existing) continue;
-
     const { genres, countries, languages, ...mediaData } = m as any;
-    const media = await Media.create({
-      ...mediaData,
-      genres: genres.map((name: string) => genreByName(name)),
-      countries: countries.map((code: string) => countryByCode(code)),
-      languages: languages.map((code: string) => langByCode(code)),
-    });
-    console.log(`Created media: ${media.title}`);
-  }
 
-  // Create people (actors/directors) so cast search has data
-  const personNames = [
-    'Christian Bale', 'Heath Ledger', 'Gary Oldman', 'Aaron Eckhart',
-    'Leonardo DiCaprio', 'Joseph Gordon-Levitt', 'Elliot Page', 'Tom Hardy',
-    'Bryan Cranston', 'Aaron Paul', 'Anna Gunn', 'Bob Odenkirk',
-    'Rumi Hiiragi', 'Miyu Irino', 'Mari Natsuki',
-    'Keanu Reeves', 'Laurence Fishburne', 'Carrie-Anne Moss', 'Hugo Weaving',
-    'Millie Bobby Brown', 'Finn Wolfhard', 'Winona Ryder', 'David Harbour',
-    'Matthew McConaughey', 'Anne Hathaway', 'Jessica Chastain', 'Michael Caine',
-    'Henry Cavill', 'Freya Allan', 'Anya Chalotra',
-    'Song Kang-ho', 'Cho Yeo-jeong', 'Lee Sun-kyun', 'Park So-dam',
-    'Timothée Chalamet', 'Zendaya', 'Rebecca Ferguson', 'Oscar Isaac',
-    'Joaquin Phoenix', 'Margot Robbie', 'Robert Downey Jr.', 'Scarlett Johansson',
-  ];
-  const people = new Map<string, any>();
-  for (const name of personNames) {
-    let person = await Person.findOne({ name });
-    if (!person) person = await Person.create({ name });
-    people.set(name, person);
-  }
-  console.log(`Created ${personNames.length} people`);
-
-  // Assign cast members to sample media
-  const castAssignments: Record<string, Array<[string, string]>> = {
-    'the-dark-knight': [['Christian Bale', 'Bruce Wayne'], ['Heath Ledger', 'The Joker'], ['Gary Oldman', 'James Gordon'], ['Aaron Eckhart', 'Harvey Dent']],
-    'inception': [['Leonardo DiCaprio', 'Dom Cobb'], ['Joseph Gordon-Levitt', 'Arthur'], ['Elliot Page', 'Ariadne'], ['Tom Hardy', 'Eames']],
-    'breaking-bad': [['Bryan Cranston', 'Walter White'], ['Aaron Paul', 'Jesse Pinkman'], ['Anna Gunn', 'Skyler White'], ['Bob Odenkirk', 'Saul Goodman']],
-    'spirited-away': [['Rumi Hiiragi', 'Chihiro'], ['Miyu Irino', 'Haku'], ['Mari Natsuki', 'Yubaba']],
-    'the-matrix': [['Keanu Reeves', 'Neo'], ['Laurence Fishburne', 'Morpheus'], ['Carrie-Anne Moss', 'Trinity'], ['Hugo Weaving', 'Agent Smith']],
-    'stranger-things': [['Millie Bobby Brown', 'Eleven'], ['Finn Wolfhard', 'Mike Wheeler'], ['Winona Ryder', 'Joyce Byers'], ['David Harbour', 'Jim Hopper']],
-    'interstellar': [['Matthew McConaughey', 'Cooper'], ['Anne Hathaway', 'Amelia Brand'], ['Jessica Chastain', 'Murph'], ['Michael Caine', 'Professor Brand']],
-    'the-witcher': [['Henry Cavill', 'Geralt of Rivia'], ['Freya Allan', 'Ciri'], ['Anya Chalotra', 'Yennefer']],
-    'parasite': [['Song Kang-ho', 'Ki-taek'], ['Cho Yeo-jeong', 'Yeon-kyo'], ['Lee Sun-kyun', 'Dong-ik'], ['Park So-dam', 'Ki-jung']],
-    'dune': [['Timothée Chalamet', 'Paul Atreides'], ['Zendaya', 'Chani'], ['Rebecca Ferguson', 'Lady Jessica'], ['Oscar Isaac', 'Duke Leto']],
-  };
-  let castCreated = 0;
-  for (const [slug, cast] of Object.entries(castAssignments)) {
-    const media = await Media.findOne({ slug });
-    if (!media) continue;
-    for (let i = 0; i < cast.length; i++) {
-      const [name, character] = cast[i];
-      const person = people.get(name);
-      if (!person) continue;
-      const exists = await CastMember.findOne({ mediaId: media._id, personId: person._id });
-      if (exists) continue;
-      await CastMember.create({ mediaId: media._id, personId: person._id, character, order: i });
-      castCreated++;
-    }
-  }
-  console.log(`Created ${castCreated} cast members`);
-
-  // Create trending entries for the hero carousel and trending row
-  const trendingSlugs = ['the-dark-knight', 'inception', 'breaking-bad', 'stranger-things', 'interstellar', 'the-witcher', 'dune', 'parasite', 'spirited-away', 'the-matrix'];
-  for (let i = 0; i < trendingSlugs.length; i++) {
-    const media = await Media.findOne({ slug: trendingSlugs[i] });
-    if (!media) continue;
-    await TrendingMedia.updateOne(
-      { period: 'week', rank: i + 1, date: new Date() },
-      { $setOnInsert: { mediaId: media._id, period: 'week', rank: i + 1, score: 100 - i * 5 } },
+    await Media.updateOne(
+      { slug: m.slug },
+      {
+        $set: {
+          ...mediaData,
+          genres: genres.map((name: string) => genreByName(name)),
+          countries: countries.map((code: string) => countryByCode(code)),
+          languages: languages.map((code: string) => langByCode(code)),
+        },
+        $unset: { watchUrl: '', sources: '' },
+      },
       { upsert: true }
     );
+    console.log(`Seeded media: ${m.title}`);
   }
+
   console.log('Created trending entries');
 
   // Create admin user

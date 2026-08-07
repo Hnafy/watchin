@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { userApi } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { Avatar } from '../components/ui/Avatar';
 import { Chip } from '../components/ui/Chip';
-import { Search, Users, UserPlus, Check, X, Loader2, Sparkles } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Search, Sparkles, Users } from 'lucide-react';
 
 interface UserResult {
   id: string;
@@ -15,29 +14,10 @@ interface UserResult {
   avatar?: string;
   role: string;
   createdAt: string;
-  followerCount: number;
-  isFollowing: boolean;
-  friendStatus: 'sent' | 'received' | null;
-}
-
-function BouncingLoader() {
-  return (
-    <div className="flex items-center justify-center gap-1.5 py-8">
-      {[0, 1, 2].map((i) => (
-        <motion.span
-          key={i}
-          className="h-2.5 w-2.5 rounded-full bg-primary-500"
-          animate={{ y: [0, -8, 0] }}
-          transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
-        />
-      ))}
-    </div>
-  );
 }
 
 export function UsersPage() {
   const { user, isAuthenticated } = useAuth();
-  const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
 
@@ -55,49 +35,15 @@ export function UsersPage() {
     enabled: debounced.length > 0,
   });
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['users'] });
-
-  const followMutation = useMutation({
-    mutationFn: (id: string) => userApi.toggleFollow(id),
-    onSuccess: invalidate,
-    onError: (e: any) => toast.error(e.response?.data?.message || 'Failed to update follow'),
-  });
-
-  const friendMutation = useMutation({
-    mutationFn: async (u: UserResult) => {
-      if (u.friendStatus === 'received') {
-        const res = await userApi.searchUsers(u.username, 1, 1);
-        const full = res.data.data[0];
-        // use requestId — not returned here; fall back to re-querying profile relation
-        const prof = await userApi.getProfile(u.username);
-        const rel = prof.data.data.relationship;
-        if (rel.requestId) {
-          await userApi.respondFriendRequest(rel.requestId, 'accept');
-          return;
-        }
-        throw new Error('Request not found');
-      } else if (u.friendStatus === 'sent') {
-        const prof = await userApi.getProfile(u.username);
-        const rel = prof.data.data.relationship;
-        if (rel.requestId) await userApi.cancelFriendRequest(rel.requestId);
-        return;
-      } else {
-        await userApi.sendFriendRequest(u.id);
-      }
-    },
-    onSuccess: invalidate,
-    onError: (e: any) => toast.error(e.response?.data?.message || e.message || 'Failed to update friend request'),
-  });
-
   const results = apiData?.data || [];
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-24 pb-16">
       <div className="mb-8">
         <h1 className="flex items-center gap-3 font-display text-4xl font-bold tracking-tight text-white">
-          <Sparkles className="h-8 w-8 text-primary-400" /> People
+          <Sparkles className="h-8 w-8 text-primary-400" /> {isAuthenticated ? 'Users' : 'People'}
         </h1>
-        <p className="mt-2 text-dark-400">Find users, follow friends, and share your watchlists.</p>
+        <p className="mt-2 text-dark-400">Find users on Watchin.</p>
       </div>
 
       <div className="relative mb-6">
@@ -120,7 +66,16 @@ export function UsersPage() {
           <p className="text-dark-400">Type a username to find people.</p>
         </div>
       ) : isLoading && isFetching ? (
-        <BouncingLoader />
+        <div className="flex items-center justify-center gap-1.5 py-8">
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              className="h-2.5 w-2.5 rounded-full bg-primary-500"
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
+            />
+          ))}
+        </div>
       ) : results.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <p className="text-dark-400">No users found for “{debounced}”.</p>
@@ -148,53 +103,9 @@ export function UsersPage() {
                     </Chip>
                   </div>
                   <p className="mt-0.5 text-xs text-dark-400">
-                    {u.followerCount} {u.followerCount === 1 ? 'follower' : 'followers'} • Joined {new Date(u.createdAt).toLocaleDateString()}
+                    Joined {new Date(u.createdAt).toLocaleDateString()}
                   </p>
                 </Link>
-
-                {!isSelf && isAuthenticated && (
-                  <div className="flex shrink-0 items-center gap-2">
-                    <button
-                      onClick={() => followMutation.mutate(u.id)}
-                      disabled={followMutation.isPending}
-                      className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
-                        u.isFollowing
-                          ? 'bg-white/[0.06] text-dark-200 hover:bg-white/[0.1]'
-                          : 'bg-primary-600 text-white hover:bg-primary-500'
-                      }`}
-                    >
-                      {followMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <UserPlus className="h-3.5 w-3.5" />
-                      )}
-                      {u.isFollowing ? 'Following' : 'Follow'}
-                    </button>
-
-                    <button
-                      onClick={() => friendMutation.mutate(u)}
-                      disabled={friendMutation.isPending}
-                      className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
-                          u.friendStatus === 'received'
-                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                            : u.friendStatus === 'sent'
-                              ? 'bg-white/[0.06] text-dark-200 hover:bg-white/[0.1]'
-                              : 'bg-white/[0.06] text-dark-200 hover:bg-white/[0.1]'
-                        }`}
-                      >
-                        {friendMutation.isPending ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : u.friendStatus === 'received' ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : u.friendStatus === 'sent' ? (
-                          <X className="h-3.5 w-3.5" />
-                        ) : (
-                          <UserPlus className="h-3.5 w-3.5" />
-                        )}
-                        {u.friendStatus === 'received' ? 'Accept' : u.friendStatus === 'sent' ? 'Sent' : 'Add friend'}
-                      </button>
-                  </div>
-                )}
               </motion.div>
             );
           })}

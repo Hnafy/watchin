@@ -4,30 +4,36 @@ import { authenticate, authorize, optionalAuth } from '../middleware/authMiddlew
 
 const router = Router();
 
-router.get('/', optionalAuth, mediaController.getMediaList);
-router.get('/browse', mediaController.searchAndFilter);
-router.get('/latest', mediaController.getLatestMedia);
-router.get('/upcoming', mediaController.getUpcoming);
-router.get('/popular', mediaController.getPopular);
-router.get('/genre/:genreSlug', mediaController.getByGenre);
-router.get('/recommended', optionalAuth, mediaController.getRecommended);
+// Public list endpoints return the same payload for guests and signed-in users
+// (real video URLs are stripped), so they can be cached by the browser/proxies.
+function publicCache(_req: any, res: any, next: any) {
+  res.set('Cache-Control', 'public, max-age=60, s-maxage=120');
+  next();
+}
+
+router.get('/', publicCache, optionalAuth, mediaController.getMediaList);
+router.get('/browse', publicCache, mediaController.searchAndFilter);
+router.get('/latest', publicCache, mediaController.getLatestMedia);
+router.get('/upcoming', publicCache, mediaController.getUpcoming);
+router.get('/popular', publicCache, mediaController.getPopular);
+router.get('/genre/:genreSlug', publicCache, mediaController.getByGenre);
+router.get('/recommended', publicCache, optionalAuth, mediaController.getRecommended);
 router.get('/recently-watched', optionalAuth, mediaController.getRecentlyWatched);
-router.get('/trending', mediaController.getTrending);
-router.get('/top-rated', mediaController.getTopRated);
-router.get('/genres', mediaController.getGenres);
-router.get('/countries', mediaController.getCountries);
-router.get('/languages', mediaController.getLanguages);
-router.get('/keywords', mediaController.getKeywords);
-router.get('/search', mediaController.searchMedia);
-router.get('/suggest', mediaController.suggest);
-router.get('/trending-searches', mediaController.trendingSearches);
+router.get('/trending', publicCache, mediaController.getTrending);
+router.get('/top-rated', publicCache, mediaController.getTopRated);
+router.get('/genres', publicCache, mediaController.getGenres);
+router.get('/countries', publicCache, mediaController.getCountries);
+router.get('/languages', publicCache, mediaController.getLanguages);
+router.get('/keywords', publicCache, mediaController.getKeywords);
+router.get('/search', publicCache, mediaController.searchMedia);
+router.get('/trending-searches', publicCache, mediaController.trendingSearches);
 router.post('/search/track', mediaController.trackSearch);
-router.get('/people/search', mediaController.searchPeople);
-router.get('/slug/:slug', optionalAuth, mediaController.getMediaBySlug);
-router.get('/:id', optionalAuth, mediaController.getMediaById);
+router.get('/slug/:slug', publicCache, optionalAuth, mediaController.getMediaBySlug);
+router.get('/:id', publicCache, optionalAuth, mediaController.getMediaById);
 router.post('/:id/view', mediaController.incrementViewCount);
 
 router.use(authenticate);
+router.get('/source/:id', mediaController.getWatchSource);
 router.post('/', authorize('ADMIN', 'MODERATOR'), mediaController.createMedia);
 router.patch('/:id', authorize('ADMIN', 'MODERATOR'), mediaController.updateMedia);
 router.delete('/:id', authorize('ADMIN'), mediaController.deleteMedia);

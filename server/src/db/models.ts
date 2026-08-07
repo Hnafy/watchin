@@ -50,7 +50,8 @@ const UserSchema = new Schema(
   {
     email: { type: String, required: true, unique: true, index: true },
     username: { type: String, required: true, unique: true, index: true },
-    passwordHash: { type: String, required: true, select: false },
+    passwordHash: { type: String, required: false, default: null, select: false },
+    googleId: { type: String, default: null, index: true },
     avatar: { type: String, default: null },
     role: {
       type: String,
@@ -60,6 +61,8 @@ const UserSchema = new Schema(
     },
     emailVerified: { type: Boolean, default: true },
     lastLoginAt: { type: Date, default: null },
+    warningCount: { type: Number, default: 0 },
+    isBanned: { type: Boolean, default: false },
     settings: { type: UserSettingsSchema, default: () => ({}) },
   },
   { ...baseOptions, timestamps: true, collection: 'users' }
@@ -81,108 +84,9 @@ const RefreshTokenSchema = new Schema(
 
 export const RefreshToken = model('RefreshToken', RefreshTokenSchema);
 
-// ---------------------------------------------------------------------------
-// Friend Request
-// ---------------------------------------------------------------------------
-const FriendRequestSchema = new Schema(
-  {
-    fromUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    toUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    status: {
-      type: String,
-      enum: ['PENDING', 'ACCEPTED', 'DECLINED', 'CANCELED'],
-      default: 'PENDING',
-      index: true,
-    },
-    createdAt: { type: Date, default: Date.now },
-  },
-  { ...baseOptions, timestamps: true, collection: 'friendrequests' }
-);
-
-FriendRequestSchema.index({ fromUserId: 1, toUserId: 1 }, { unique: true });
-export const FriendRequest = model('FriendRequest', FriendRequestSchema);
-
-// ---------------------------------------------------------------------------
-// Follow
-// ---------------------------------------------------------------------------
-const FollowSchema = new Schema(
-  {
-    followerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    followedId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    createdAt: { type: Date, default: Date.now },
-  },
-  { ...baseOptions, timestamps: true, collection: 'follows' }
-);
-
-FollowSchema.index({ followerId: 1, followedId: 1 }, { unique: true });
-export const Follow = model('Follow', FollowSchema);
-
-// ---------------------------------------------------------------------------
-// Profile Like
-// ---------------------------------------------------------------------------
-const ProfileLikeSchema = new Schema(
-  {
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    likerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    createdAt: { type: Date, default: Date.now },
-  },
-  { ...baseOptions, timestamps: true, collection: 'profilelikes' }
-);
-
-ProfileLikeSchema.index({ userId: 1, likerId: 1 }, { unique: true });
-export const ProfileLike = model('ProfileLike', ProfileLikeSchema);
-
-// ---------------------------------------------------------------------------
-// Playlist
-// ---------------------------------------------------------------------------
-const PlaylistSchema = new Schema(
-  {
-    title: { type: String, required: true, trim: true },
-    description: { type: String, default: null },
-    coverImage: { type: String, default: null },
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    visibility: {
-      type: String,
-      enum: ['PUBLIC', 'PRIVATE'],
-      default: 'PUBLIC',
-      index: true,
-    },
-    items: [
-      {
-        mediaId: { type: Schema.Types.ObjectId, ref: 'Media', required: true },
-        addedAt: { type: Date, default: Date.now },
-        progress: { type: Number, default: 0 },
-        rating: { type: Number, min: 1, max: 10, default: null },
-        notes: { type: String, default: null, trim: true },
-      },
-    ],
-    likes: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-    likeCount: { type: Number, default: 0 },
-    saves: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-    saveCount: { type: Number, default: 0 },
-    forkedFrom: { type: Schema.Types.ObjectId, ref: 'Playlist', default: null },
-    forkCount: { type: Number, default: 0 },
-    createdAt: { type: Date, default: Date.now, index: true },
-    updatedAt: { type: Date, default: Date.now, index: true },
-  },
-  { ...baseOptions, timestamps: true, collection: 'playlists' }
-);
-
-PlaylistSchema.index({ userId: 1, createdAt: -1 });
-PlaylistSchema.index({ visibility: 1, likeCount: -1, createdAt: -1 });
-PlaylistSchema.index({ visibility: 1, saveCount: -1, createdAt: -1 });
-PlaylistSchema.virtual('user', {
-  ref: 'User',
-  localField: 'userId',
-  foreignField: '_id',
-  justOne: true,
-  select: 'username avatar role',
-});
-export const Playlist = model('Playlist', PlaylistSchema);
-
-// ---------------------------------------------------------------------------
-// Media
-// ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Media
+  // ---------------------------------------------------------------------------
 const MediaSchema = new Schema(
   {
     slug: { type: String, required: true, unique: true, index: true },
@@ -239,16 +143,6 @@ MediaSchema.index({ type: 1, status: 1 });
 MediaSchema.index({ releaseDate: -1 });
 MediaSchema.index({ firstAirDate: -1 });
 
-MediaSchema.virtual('cast', {
-  ref: 'CastMember',
-  localField: '_id',
-  foreignField: 'mediaId',
-});
-MediaSchema.virtual('directors', {
-  ref: 'Director',
-  localField: '_id',
-  foreignField: 'mediaId',
-});
 MediaSchema.virtual('seasons', {
   ref: 'Season',
   localField: '_id',
@@ -311,56 +205,9 @@ const KeywordSchema = new Schema(
 );
 export const Keyword = model('Keyword', KeywordSchema);
 
-// ---------------------------------------------------------------------------
-// Person / CastMember / Director
-// ---------------------------------------------------------------------------
-const PersonSchema = new Schema(
-  {
-    name: { type: String, required: true, index: true },
-    profilePath: { type: String, default: null },
-  },
-  { ...baseOptions, collection: 'people' }
-);
-export const Person = model('Person', PersonSchema);
-
-const CastMemberSchema = new Schema(
-  {
-    mediaId: { type: Schema.Types.ObjectId, ref: 'Media', required: true, index: true },
-    personId: { type: Schema.Types.ObjectId, ref: 'Person', required: true, index: true },
-    character: { type: String, default: null },
-    order: { type: Number, default: 0 },
-  },
-  { ...baseOptions, collection: 'castmembers' }
-);
-CastMemberSchema.index({ mediaId: 1, personId: 1, character: 1 }, { unique: true });
-CastMemberSchema.virtual('person', {
-  ref: 'Person',
-  localField: 'personId',
-  foreignField: '_id',
-  justOne: true,
-});
-export const CastMember = model('CastMember', CastMemberSchema);
-
-const DirectorSchema = new Schema(
-  {
-    mediaId: { type: Schema.Types.ObjectId, ref: 'Media', required: true, index: true },
-    personId: { type: Schema.Types.ObjectId, ref: 'Person', required: true, index: true },
-    order: { type: Number, default: 0 },
-  },
-  { ...baseOptions, collection: 'directors' }
-);
-DirectorSchema.index({ mediaId: 1, personId: 1 }, { unique: true });
-DirectorSchema.virtual('person', {
-  ref: 'Person',
-  localField: 'personId',
-  foreignField: '_id',
-  justOne: true,
-});
-export const Director = model('Director', DirectorSchema);
-
-// ---------------------------------------------------------------------------
-// Season / Episode
-// ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Season / Episode
+  // ---------------------------------------------------------------------------
 const SeasonSchema = new Schema(
   {
     mediaId: { type: Schema.Types.ObjectId, ref: 'Media', required: true, index: true },
@@ -415,18 +262,40 @@ const WatchlistItemSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     mediaId: { type: Schema.Types.ObjectId, ref: 'Media', required: true, index: true },
+    folderId: { type: Schema.Types.ObjectId, ref: 'WatchlistFolder', default: null, index: true },
     addedAt: { type: Date, default: Date.now },
   },
   { ...baseOptions, collection: 'watchlistitems' }
 );
 WatchlistItemSchema.index({ userId: 1, mediaId: 1 }, { unique: true });
+WatchlistItemSchema.index({ userId: 1, folderId: 1 });
 WatchlistItemSchema.virtual('media', {
   ref: 'Media',
   localField: 'mediaId',
   foreignField: '_id',
   justOne: true,
 });
+WatchlistItemSchema.virtual('folder', {
+  ref: 'WatchlistFolder',
+  localField: 'folderId',
+  foreignField: '_id',
+  justOne: true,
+});
 export const WatchlistItem = model('WatchlistItem', WatchlistItemSchema);
+
+// ---------------------------------------------------------------------------
+// WatchlistFolder
+// ---------------------------------------------------------------------------
+const WatchlistFolderSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    name: { type: String, required: true, maxlength: 60, trim: true },
+    icon: { type: String, default: null },
+  },
+  { ...baseOptions, timestamps: true, collection: 'watchlistfolders' }
+);
+WatchlistFolderSchema.index({ userId: 1, name: 1 }, { unique: true });
+export const WatchlistFolder = model('WatchlistFolder', WatchlistFolderSchema);
 
 // ---------------------------------------------------------------------------
 // Rating
@@ -588,7 +457,7 @@ const NotificationSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     type: {
       type: String,
-      enum: ['WELCOME', 'SYSTEM', 'ADMIN', 'WATCHLIST', 'RATING', 'REPLY', 'CONTENT', 'FRIEND_REQUEST', 'FOLLOW', 'PLAYLIST', 'LIKE'],
+      enum: ['WELCOME', 'SYSTEM', 'ADMIN', 'WATCHLIST', 'RATING', 'REPLY', 'MENTION', 'CONTENT', 'MESSAGE', 'REPORT', 'WARNING'],
       default: 'SYSTEM',
     },
     title: { type: String, required: true },
@@ -604,6 +473,24 @@ const NotificationSchema = new Schema(
 
 NotificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
 export const Notification = model('Notification', NotificationSchema);
+
+// ---------------------------------------------------------------------------
+// EmailVerification
+// ---------------------------------------------------------------------------
+const EmailVerificationSchema = new Schema(
+  {
+    email: { type: String, required: true, lowercase: true, index: true },
+    code: { type: String, required: true },
+    purpose: { type: String, enum: ['REGISTER'], default: 'REGISTER' },
+    attempts: { type: Number, default: 0 },
+    expiresAt: { type: Date, required: true },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { collection: 'emailverifications' }
+);
+
+EmailVerificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+export const EmailVerification = model('EmailVerification', EmailVerificationSchema);
 
 // ---------------------------------------------------------------------------
 // SearchLog
@@ -659,6 +546,20 @@ const CommentSchema = new Schema(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     parentId: { type: Schema.Types.ObjectId, ref: 'Comment', default: null, index: true },
     content: { type: String, required: true, maxlength: 2000 },
+    hidden: { type: Boolean, default: false, index: true },
+    moderationStatus: {
+      type: String,
+      enum: ['PENDING', 'APPROVED', 'FLAGGED'],
+      default: 'APPROVED',
+    },
+    reportCount: { type: Number, default: 0 },
+    reports: [
+      {
+        user: { type: Schema.Types.ObjectId, ref: 'User' },
+        reason: { type: String, default: null },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { ...baseOptions, timestamps: true, collection: 'comments' }
 );
@@ -676,3 +577,16 @@ CommentSchema.virtual('replies', {
   foreignField: 'parentId',
 });
 export const Comment = model('Comment', CommentSchema);
+
+// ---------------------------------------------------------------------------
+// BlockedEmail
+// ---------------------------------------------------------------------------
+const BlockedEmailSchema = new Schema(
+  {
+    email: { type: String, required: true, unique: true, lowercase: true, index: true },
+    note: { type: String, default: null },
+    blockedBy: { type: Schema.Types.ObjectId, ref: 'User', default: null },
+  },
+  { ...baseOptions, timestamps: true, collection: 'blockedemails' }
+);
+export const BlockedEmail = model('BlockedEmail', BlockedEmailSchema);
