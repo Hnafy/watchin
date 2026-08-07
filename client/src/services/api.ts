@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-export const API_URL = import.meta.env.VITE_API_URL || '/api';
+export const API_URL = "https://watchin-4crs.vercel.app/api";
+// export const API_URL = "/api";
 
 const ACCESS_TOKEN_KEY = 'watchin_accessToken';
 const REFRESH_TOKEN_KEY = 'watchin_refreshToken';
