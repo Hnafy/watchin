@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import {
   Film, Users, Clock, TrendingUp, Plus, Eye, BarChart3, ChevronLeft, ChevronRight,
   Star, Heart, Trash2, Edit, Search, ArrowUpRight, ArrowDownRight, Activity, Radio,
-  MessageSquare,
+  MessageSquare, BadgeCheck, BadgeX, EyeOff, Settings, Ban, AlertTriangle,
 } from 'lucide-react';
 import { ConfirmModal } from '../../components/ui/Modal';
 import { useI18n } from '../../i18n/LanguageProvider';
@@ -186,6 +186,7 @@ function ContentTab() {
           <option value="">{t('admin.allTypes')}</option>
           <option value="MOVIE">{t('admin.movies')}</option>
           <option value="TV_SHOW">{t('admin.tvShows')}</option>
+          <option value="ANIME">Anime</option>
         </select>
       </div>
 
@@ -225,13 +226,13 @@ function ContentTab() {
                         </div>}
                       <div>
                         <p className="font-medium text-sm line-clamp-1 group-hover:text-primary-400 transition-colors">{m.title}</p>
-                        <p className="text-xs text-dark-400">{m.type === 'MOVIE' ? t('admin.movie') : t('admin.tvShow')}</p>
+                        <p className="text-xs text-dark-400">{m.type === 'MOVIE' ? t('admin.movie') : m.type === 'ANIME' ? 'Anime' : t('admin.tvShow')}</p>
                       </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
-                    <span className={`badge ${m.type === 'MOVIE' ? 'badge-primary' : 'badge-success'}`}>
-                      {m.type === 'MOVIE' ? t('admin.movie') : t('admin.tvShow')}
+                    <span className={`badge ${m.type === 'MOVIE' ? 'badge-primary' : m.type === 'ANIME' ? 'badge-info' : 'badge-success'}`}>
+                      {m.type === 'MOVIE' ? t('admin.movie') : m.type === 'ANIME' ? 'Anime' : t('admin.tvShow')}
                     </span>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
@@ -283,12 +284,104 @@ function ContentTab() {
   );
 }
 
+function BlockedEmailsPanel() {
+  const qc = useQueryClient();
+  const { t } = useI18n();
+  const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
+
+  const { data } = useQuery({
+    queryKey: ['admin', 'blocked-emails'],
+    queryFn: () => adminApi.getBlockedEmails(),
+    select: (r) => r.data.data,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: ({ email, note }: { email: string; note?: string }) => adminApi.addBlockedEmail(email, note),
+    onSuccess: () => {
+      toast.success(t('admin.emailBlocked'));
+      setEmail('');
+      setNote('');
+      qc.invalidateQueries({ queryKey: ['admin', 'blocked-emails'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => adminApi.removeBlockedEmail(id),
+    onSuccess: () => {
+      toast.success(t('admin.emailUnblocked'));
+      qc.invalidateQueries({ queryKey: ['admin', 'blocked-emails'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
+  const items = data || [];
+
+  return (
+    <div className="glass-card rounded-2xl p-5">
+      <h3 className="flex items-center gap-2 font-display text-base font-semibold text-white">
+        <Ban className="h-4 w-4 text-red-400" /> {t('admin.blockedEmailsTitle')}
+      </h3>
+      <p className="mt-1 text-sm text-dark-400">{t('admin.blockedEmailsSubtitle')}</p>
+
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder={t('admin.blockedEmailPlaceholder')}
+          className="input flex-1"
+        />
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={t('admin.blockNote')}
+          className="input sm:max-w-xs"
+        />
+        <button
+          onClick={() => addMutation.mutate({ email, note })}
+          disabled={addMutation.isPending || !email.trim()}
+          className="btn btn-danger"
+        >
+          <Plus className="h-4 w-4" /> {t('admin.addBlockedEmail')}
+        </button>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {items.length === 0 ? (
+          <p className="text-sm text-dark-500">{t('admin.noBlockedEmails')}</p>
+        ) : items.map((b: any) => (
+          <div key={b._id || b.id} className="flex items-center justify-between gap-3 rounded-xl border border-dark-600/50 bg-dark-900/50 px-3 py-2.5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-red-300">{b.email}</p>
+              {b.note && <p className="truncate text-xs text-dark-400">{b.note}</p>}
+            </div>
+            <button
+              onClick={() => removeMutation.mutate(b._id || b.id)}
+              disabled={removeMutation.isPending}
+              className="rounded-lg p-1.5 text-dark-400 transition-colors hover:bg-red-900/20 hover:text-red-400"
+              title={t('admin.unblock')}
+            >
+              <Ban className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function UsersTab() {
   const qc = useQueryClient();
   const { t } = useI18n();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [blockEmail, setBlockEmail] = useState<string | null>(null);
+  const [messageUser, setMessageUser] = useState<any>(null);
+  const [messageText, setMessageText] = useState('');
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'users', page, search],
@@ -302,9 +395,50 @@ function UsersTab() {
     onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
   });
 
+  const verifyMutation = useMutation({
+    mutationFn: ({ id, emailVerified }: { id: string; emailVerified: boolean }) =>
+      adminApi.updateUserVerified(id, emailVerified),
+    onSuccess: () => {
+      toast.success(t('admin.verifiedUpdated'));
+      qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
+  const messageMutation = useMutation({
+    mutationFn: ({ id, title, body }: { id: string; title?: string; body: string }) =>
+      adminApi.sendUserMessage(id, { title, body }),
+    onSuccess: (d: any) => {
+      toast.success(t('admin.userMessaged', { username: d?.data?.recipient ?? d?.data?.username ?? 'user' }));
+      qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+      setMessageUser(null);
+      setMessageText('');
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
+  const warnMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => adminApi.warnUser(id, reason),
+    onSuccess: () => {
+      toast.success(t('admin.userWarned'));
+      qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => adminApi.deleteUser(id),
     onSuccess: () => { toast.success(t('admin.userDeleted')); qc.invalidateQueries({ queryKey: ['admin', 'users'] }); setDeleteId(null); },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
+  const blockEmailMutation = useMutation({
+    mutationFn: (email: string) => adminApi.addBlockedEmail(email),
+    onSuccess: () => {
+      toast.success(t('admin.emailBlocked'));
+      qc.invalidateQueries({ queryKey: ['admin', 'blocked-emails'] });
+      setBlockEmail(null);
+    },
     onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
   });
 
@@ -313,6 +447,7 @@ function UsersTab() {
 
   return (
     <div className="space-y-4">
+      <BlockedEmailsPanel />
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dark-400" />
         <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
@@ -326,6 +461,7 @@ function UsersTab() {
               <tr className="border-b border-dark-700 bg-dark-950/50">
                 <th className="px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase">{t('admin.user')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase hidden sm:table-cell">{t('admin.role')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase hidden md:table-cell">Verified</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase hidden md:table-cell">{t('admin.joined')}</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase hidden md:table-cell">{t('admin.activity')}</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-dark-400 uppercase">{t('admin.actions')}</th>
@@ -354,6 +490,21 @@ function UsersTab() {
                       <option value="ADMIN">{t('admin.roleAdmin')}</option>
                     </select>
                   </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <button
+                      onClick={() => verifyMutation.mutate({ id: u.id, emailVerified: !u.emailVerified })}
+                      disabled={u.role === 'ADMIN'}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition-all disabled:opacity-50 ${
+                        u.emailVerified
+                          ? 'bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30 hover:bg-emerald-500/20'
+                          : 'bg-dark-700 text-dark-400 ring-1 ring-dark-600 hover:text-white'
+                      }`}
+                      title={t('admin.toggleVerified')}
+                    >
+                      {u.emailVerified ? <BadgeCheck className="h-3.5 w-3.5" /> : <BadgeX className="h-3.5 w-3.5" />}
+                      {u.emailVerified ? t('admin.verified') : t('admin.unverified')}
+                    </button>
+                  </td>
                   <td className="px-4 py-3 hidden md:table-cell text-sm text-dark-500">{new Date(u.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <div className="flex gap-3 text-xs text-dark-400">
@@ -362,11 +513,25 @@ function UsersTab() {
                       <span className="flex items-center gap-1"><Heart className="h-3 w-3" /> {u._count?.watchlistItems || 0}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => setDeleteId(u.id)} className="p-1.5 rounded-lg hover:bg-red-900/20 text-red-500 transition-colors">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
+                   <td className="px-4 py-3 text-right">
+                     <button onClick={() => setBlockEmail(u.email)} className="p-1.5 rounded-lg hover:bg-amber-900/20 text-amber-500 transition-colors" title={t('admin.blockEmail')}>
+                       <Ban className="h-4 w-4" />
+                     </button>
+                     <button onClick={() => setMessageUser(u)} className="p-1.5 rounded-lg hover:bg-sky-900/20 text-sky-500 transition-colors" title={t('admin.messageUser')}>
+                       <MessageSquare className="h-4 w-4" />
+                     </button>
+                     <button
+                       onClick={() => warnMutation.mutate({ id: u.id })}
+                       className="p-1.5 rounded-lg hover:bg-orange-900/20 text-orange-500 transition-colors"
+                       title={t('admin.warnUser')}
+                       disabled={u.role === 'ADMIN'}
+                     >
+                       <AlertTriangle className="h-4 w-4" />
+                     </button>
+                     <button onClick={() => setDeleteId(u.id)} className="p-1.5 rounded-lg hover:bg-red-900/20 text-red-500 transition-colors">
+                       <Trash2 className="h-4 w-4" />
+                     </button>
+                   </td>
                 </tr>
               ))}
             </tbody>
@@ -395,6 +560,125 @@ function UsersTab() {
         confirmLabel={t('admin.deleteUserBtn')}
         loading={deleteMutation.isPending}
       />
+
+      <ConfirmModal
+        open={!!blockEmail}
+        onClose={() => setBlockEmail(null)}
+        onConfirm={() => blockEmail && blockEmailMutation.mutate(blockEmail)}
+        title={t('admin.blockEmail')}
+        message={t('admin.blockEmailConfirm', { email: blockEmail || '' })}
+        confirmLabel={t('admin.block')}
+        loading={blockEmailMutation.isPending}
+      />
+
+      {/* Send Message to User */}
+      {messageUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-dark-700 bg-dark-900 p-6 shadow-xl">
+            <h3 className="font-display text-lg font-semibold text-white">
+              {t('admin.messageUser')} — {messageUser.username}
+            </h3>
+            <p className="mt-1 text-sm text-dark-400">{messageUser.email}</p>
+            <textarea
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              placeholder={t('admin.messagePlaceholder')}
+              rows={5}
+              className="mt-4 w-full resize-y rounded-xl border border-dark-700 bg-dark-950 px-3.5 py-2.5 text-sm text-white placeholder:text-dark-500 focus:border-primary-500/60 focus:outline-none"
+            />
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setMessageUser(null)}
+                className="px-4 py-2 text-sm font-medium text-dark-300 hover:text-white"
+              >
+                {t('common.close')}
+              </button>
+              <button
+                onClick={() => {
+                  if (!messageText.trim()) return toast.error(t('admin.messageRequired'));
+                  messageMutation.mutate({ id: messageUser.id, body: messageText });
+                }}
+                disabled={messageMutation.isPending || !messageText.trim()}
+                className="rounded-xl bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+              >
+                {messageMutation.isPending ? t('admin.sending') : t('admin.send')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CommentSettingsPanel() {
+  const qc = useQueryClient();
+  const { t } = useI18n();
+
+  const { data } = useQuery({
+    queryKey: ['admin', 'comment-settings'],
+    queryFn: () => adminApi.getCommentSettings(),
+    select: (r) => r.data.data,
+  });
+
+  const settingsMutation = useMutation({
+    mutationFn: ({ key, value }: { key: string; value: unknown }) =>
+      adminApi.updateCommentSettings(key, value),
+    onSuccess: () => {
+      toast.success(t('admin.settingsSaved'));
+      qc.invalidateQueries({ queryKey: ['admin', 'comment-settings'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
+  const toggles: Array<{ key: string; label: string; value: boolean }> = data
+    ? [
+        { key: 'enabled', label: 'Comments enabled', value: !!data.enabled },
+        { key: 'requireVerifiedEmail', label: 'Require verified email to comment', value: !!data.requireVerifiedEmail },
+        { key: 'profanityFilter', label: 'Profanity filter', value: !!data.profanityFilter },
+        { key: 'aiModeration', label: 'AI moderation', value: !!data.aiModeration },
+      ]
+    : [];
+
+  return (
+    <div className="glass-card rounded-2xl p-5">
+      <h3 className="flex items-center gap-2 font-display text-base font-semibold text-white">
+        <Settings className="h-4 w-4 text-primary-400" /> {t('admin.commentSettings')}
+      </h3>
+      <div className="mt-4 space-y-3">
+        {toggles.map((tg) => (
+          <div key={tg.key} className="flex items-center justify-between gap-4">
+            <span className="text-sm text-dark-200">{tg.label}</span>
+            <button
+              onClick={() => settingsMutation.mutate({ key: tg.key, value: !tg.value })}
+              disabled={settingsMutation.isPending}
+              className={`relative h-6 w-11 rounded-full transition-colors ${
+                tg.value ? 'bg-primary-600' : 'bg-dark-600'
+              } disabled:opacity-50`}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${tg.value ? 'left-[22px]' : 'left-0.5'}`} />
+            </button>
+          </div>
+        ))}
+        {data && (
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm text-dark-200">{t('admin.reportThreshold')}</span>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              defaultValue={data.reportThreshold}
+              onBlur={(e) => {
+                const v = Number(e.target.value);
+                if (Number.isFinite(v) && v >= 1 && v !== data.reportThreshold) {
+                  settingsMutation.mutate({ key: 'reportThreshold', value: v });
+                }
+              }}
+              className="input w-20 text-sm"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -404,11 +688,12 @@ function CommentsTab() {
   const { t } = useI18n();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'comments', page, search],
-    queryFn: () => adminApi.getAllComments(page, 15, search),
+    queryKey: ['admin', 'comments', page, search, filter],
+    queryFn: () => adminApi.getAllComments(page, 15, search, filter),
     select: (r) => r.data,
   });
 
@@ -422,15 +707,55 @@ function CommentsTab() {
     onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
   });
 
+  const hideMutation = useMutation({
+    mutationFn: ({ id, hidden }: { id: string; hidden: boolean }) =>
+      adminApi.setCommentHidden(id, hidden),
+    onSuccess: () => {
+      toast.success(t('admin.commentUpdated'));
+      qc.invalidateQueries({ queryKey: ['admin', 'comments'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
+  const warnReportersMutation = useMutation({
+    mutationFn: (id: string) => adminApi.warnCommentReporters(id),
+    onSuccess: () => {
+      toast.success(t('admin.reportersWarned'));
+      qc.invalidateQueries({ queryKey: ['admin', 'comments'] });
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
   const items = data?.data || [];
   const pagination = data?.pagination;
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dark-400" />
-        <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder={t('admin.searchComments')} className="input pl-10" />
+      <CommentSettingsPanel />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex w-fit rounded-xl border border-dark-600/50 bg-dark-800/40 p-1">
+          {[
+            { key: 'all', label: t('admin.allComments') },
+            { key: 'reported', label: t('admin.reportedComments') },
+            { key: 'mentions-admins', label: t('admin.mentionsComments') },
+          ].map((f) => (
+            <button
+              key={f.key}
+              onClick={() => { setFilter(f.key); setPage(1); }}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all ${
+                filter === f.key ? 'bg-primary-600 text-white shadow' : 'text-dark-400 hover:text-dark-200'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dark-400" />
+          <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder={t('admin.searchComments')} className="input pl-10" />
+        </div>
       </div>
 
       <div className="card overflow-hidden">
@@ -453,7 +778,9 @@ function CommentsTab() {
                   <MessageSquare className="h-12 w-12 mx-auto mb-3 text-dark-600" />
                   <p className="font-medium">{t('admin.noComments')}</p>
                 </td></tr>
-              ) : items.map((c: any) => (
+              ) : items.map((c: any) => {
+                const hidden = !!c.hidden || c.moderationStatus === 'REJECTED';
+                return (
                 <tr key={c._id || c.id} className="hover:bg-dark-900/50 transition-colors group">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -468,8 +795,18 @@ function CommentsTab() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-sm max-w-xs line-clamp-2 text-dark-200">{c.content}</p>
-                    {c.parentId && <p className="mt-1 text-[10px] uppercase tracking-wider text-dark-500">{t('admin.reply')}</p>}
+                    <p className={`text-sm max-w-xs line-clamp-2 text-dark-200 ${hidden ? 'opacity-40 line-through' : ''}`}>{c.content}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      {c.parentId && <p className="text-[10px] uppercase tracking-wider text-dark-500">{t('admin.reply')}</p>}
+                      {hidden && (
+                        <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-300">Hidden</span>
+                      )}
+                      {c.reportCount > 0 && (
+                        <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300">
+                          {c.reportCount} report{c.reportCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     {c.mediaId ? (
@@ -479,13 +816,32 @@ function CommentsTab() {
                     ) : <span className="text-sm text-dark-500">—</span>}
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell text-sm text-dark-500">{new Date(c.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => setDeleteId(c._id || c.id)} className="p-1.5 rounded-lg hover:bg-red-900/20 text-red-500 transition-colors" title={t('admin.delete')}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </td>
+                   <td className="px-4 py-3 text-right">
+                     <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                       {c.reportCount > 0 && (
+                         <button
+                           onClick={() => warnReportersMutation.mutate(c._id || c.id)}
+                           className="p-1.5 rounded-lg hover:bg-orange-900/20 text-orange-500 transition-colors"
+                           title={t('admin.warnReporters')}
+                         >
+                           <AlertTriangle className="h-4 w-4" />
+                         </button>
+                       )}
+                       <button
+                         onClick={() => hideMutation.mutate({ id: c._id || c.id, hidden: !hidden })}
+                         className="p-1.5 rounded-lg hover:bg-dark-800 transition-colors"
+                         title={hidden ? t('admin.unhide') : t('admin.hide')}
+                       >
+                         {hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                       </button>
+                       <button onClick={() => setDeleteId(c._id || c.id)} className="p-1.5 rounded-lg hover:bg-red-900/20 text-red-500 transition-colors" title={t('admin.delete')}>
+                         <Trash2 className="h-4 w-4" />
+                       </button>
+                     </div>
+                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

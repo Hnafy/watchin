@@ -8,6 +8,7 @@ import { motion } from 'framer-motion';
 import { Media, WatchlistItem } from '../types';
 import { useI18n } from '../i18n/LanguageProvider';
 import { SEOPage } from '../components/SEO';
+import { ConfirmModal } from '../components/ui/Modal';
 import { useAddToWatchlist, useRemoveFromWatchlist } from '../hooks/useMedia';
 import toast from 'react-hot-toast';
 
@@ -43,6 +44,7 @@ export function Watchlist() {
   const addToWatchlist = useAddToWatchlist();
   const removeFromWatchlist = useRemoveFromWatchlist();
   const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const handlePlay = (m: Media) => navigate(`/watch/${m.id}`);
   const handleAddToList = (m: Media) => {
@@ -103,11 +105,7 @@ export function Watchlist() {
           </div>
           {items.length > 0 && (
             <button
-              onClick={() => {
-                if (window.confirm('Clear all items from your watchlist?')) {
-                  clearMutation.mutate();
-                }
-              }}
+              onClick={() => setConfirmClear(true)}
               disabled={clearMutation.isPending}
               className="btn btn-glass flex items-center gap-2 px-4 py-2.5 text-sm font-medium hover:text-red-400 disabled:opacity-50"
             >
@@ -121,6 +119,17 @@ export function Watchlist() {
           )}
           <div className="pointer-events-none absolute inset-x-0 -bottom-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
         </motion.div>
+
+        <ConfirmModal
+          open={confirmClear}
+          onClose={() => setConfirmClear(false)}
+          onConfirm={() => clearMutation.mutate()}
+          title={t('watchlist.clearAll')}
+          message={t('watchlist.clearConfirm')}
+          confirmLabel={t('watchlist.clearAll')}
+          variant="danger"
+          loading={clearMutation.isPending}
+        />
 
         {items.length === 0 ? (
           <motion.div
@@ -170,6 +179,6 @@ export function Watchlist() {
         )}
       </div>
     </div>
-  </>
+    </>
   );
 }

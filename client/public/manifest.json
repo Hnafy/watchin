@@ -4,46 +4,45 @@
   "description": "Stream movies, TV shows, and anime in 4K HDR. Personalized recommendations, watchlists, and seamless playback across devices.",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "32x32",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/icons/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
     },
     {
-      "src": "/logo.png",
-      "sizes": "500x500",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "src": "/icons/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["entertainment", "video"],
-  "screenshots": [],
   "shortcuts": [
     {
       "name": "Movies",
       "short_name": "Movies",
       "description": "Browse movies",
       "url": "/movies",
-      "icons": [{ "src": "/favicon.ico", "sizes": "32x32" }]
+      "icons": [{ "src": "/icons/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "TV Shows",
       "short_name": "TV Shows",
       "description": "Browse TV shows",
       "url": "/tv-shows",
-      "icons": [{ "src": "/favicon.ico", "sizes": "32x32" }]
+      "icons": [{ "src": "/icons/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" }]
     },
     {
       "name": "Search",
       "short_name": "Search",
       "description": "Search content",
       "url": "/search",
-      "icons": [{ "src": "/favicon.ico", "sizes": "32x32" }]
+      "icons": [{ "src": "/icons/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

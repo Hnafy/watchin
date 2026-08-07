@@ -2,40 +2,40 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Search, User, LogOut, Heart, LayoutDashboard, Settings, SlidersHorizontal, Film, Tv, Zap, Sparkles, Bell, ListMusic, Users } from 'lucide-react';
+import { Menu, X, Search, User, LogOut, Heart, LayoutDashboard, Settings, SlidersHorizontal, Film, Tv, Zap, Sparkles, Bell, ListMusic, MessageSquare, Download } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { FilterPopover } from '../search/FilterPopover';
 import { SearchFilters } from '../../types';
 import { paramsToFilters, filtersToSearchParams } from '../../utils/filters';
 import { notificationApi } from '../../services/api';
+import { useI18n } from '../../i18n/LanguageProvider';
+import { useSupport } from '../providers/SupportProvider';
+import { LanguageSwitcher } from '../ui/LanguageSwitcher';
 
 const NAV_LINKS = [
-  { to: '/', label: 'Home' },
-  { to: '/movies', label: 'Movies' },
-  { to: '/tv-shows', label: 'TV Shows' },
-  { to: '/anime', label: 'Anime' },
+  { to: '/', label: 'nav.home' },
+  { to: '/movies', label: 'nav.movies' },
+  { to: '/tv-shows', label: 'nav.tv' },
+  { to: '/anime', label: 'nav.anime' },
 ];
 
 const CATEGORIES = [
-  { to: '/movies', label: 'Movies', icon: Film },
-  { to: '/tv-shows', label: 'TV Shows', icon: Tv },
-  { to: '/trending', label: 'Trending', icon: Zap },
-  { to: '/anime', label: 'Anime', icon: Sparkles },
-];
-
-const MOBILE_NAV_LINKS = [
-  { to: '/', label: 'Home' },
-  { to: '/users', label: 'People' },
+  { to: '/movies', label: 'nav.movies', icon: Film },
+  { to: '/tv-shows', label: 'nav.tv', icon: Tv },
+  { to: '/trending', label: 'nav.newPopular', icon: Zap },
+  { to: '/anime', label: 'nav.anime', icon: Sparkles },
 ];
 
 const USER_MENU_ITEMS = [
-  { to: '/profile', icon: User, label: 'Profile' },
-  { to: '/watchlist', icon: Heart, label: 'Watchlist' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/profile', icon: User, label: 'header.profile' },
+  { to: '/watchlist', icon: Heart, label: 'header.myList' },
+  { to: '/settings', icon: Settings, label: 'header.settings' },
 ];
 
 export const Header = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { t } = useI18n();
+  const { openSupport } = useSupport();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -44,6 +44,7 @@ export const Header = () => {
   const [scrolled, setScrolled] = useState(false);
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [installable, setInstallable] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isCategoryActive = (cat: { to: string }) => location.pathname === cat.to;
@@ -73,6 +74,18 @@ export const Header = () => {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    const onInstall = (e: Event) => setInstallable((e as CustomEvent).detail?.available ?? false);
+    window.addEventListener('pwa-install', onInstall as any);
+    return () => window.removeEventListener('pwa-install', onInstall as any);
+  }, []);
+
+  const handleInstall = () => {
+    if ((window as any).watchinInstall?.()) {
+      setInstallable(false);
+    }
+  };
 
   const currentFilters = paramsToFilters(new URLSearchParams(location.search));
   const activeFilterCount =
@@ -132,7 +145,7 @@ export const Header = () => {
                   ? 'text-white bg-white/10'
                   : 'text-white/60 hover:text-white hover:bg-white/5'
               }`}>
-              {link.label}
+              {t(link.label)}
             </Link>
           ))}
         </div>
@@ -155,15 +168,9 @@ export const Header = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onFocus={() => setSearchExpanded(true)}
                     onBlur={() => setTimeout(() => setSearchExpanded(false), 150)}
-                    placeholder="Search"
+placeholder={t('search.placeholder')}
                     className="w-full min-w-0 bg-transparent px-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none"
                   />
-                  {searchQuery && (
-                    <button type="button" onClick={() => setSearchQuery('')}
-                      className="p-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  )}
                   <span className="mx-1 h-4 w-px bg-white/10" />
                   <motion.button
                     type="button"
@@ -175,7 +182,7 @@ export const Header = () => {
                         ? 'bg-primary-600/20 text-primary-300'
                         : 'text-white/40 hover:text-white hover:bg-white/10'
                     }`}
-                    title="Filters"
+                    title={t('search.filters')}
                   >
                     <SlidersHorizontal className="h-3.5 w-3.5" />
                     {activeFilterCount > 0 && (
@@ -206,10 +213,14 @@ export const Header = () => {
               <Heart className="h-5 w-5" />
             </Link>
 
-            {/* Playlists */}
-            <Link to="/playlists" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block">
-              <ListMusic className="h-5 w-5" />
-            </Link>
+            {/* Contact Admin */}
+            <button
+              onClick={() => openSupport({ context: t('header.contactAdmin') })}
+              className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block"
+              title={t('header.contactAdmin')}
+            >
+              <MessageSquare className="h-5 w-5" />
+            </button>
 
             {/* Notifications */}
             <Link to="/notifications" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block relative">
@@ -221,10 +232,16 @@ export const Header = () => {
               )}
             </Link>
 
-            {/* People */}
-            <Link to="/users" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block relative">
-              <Users className="h-5 w-5" />
-            </Link>
+            {/* Install App (PWA) */}
+            {installable && (
+              <button
+                onClick={handleInstall}
+                className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-primary-500/20 transition-colors hidden sm:block"
+                title={t('header.installApp')}
+              >
+                <Download className="h-5 w-5" />
+              </button>
+            )}
 
             {/* User Menu */}
           <div className="relative" ref={menuRef}>
@@ -254,35 +271,33 @@ export const Header = () => {
                         <p className="text-xs text-dark-400 truncate">{user.email}</p>
                       </div>
                       {[
-                        { to: '/profile', icon: User, label: 'Profile' },
-                        { to: `/user/${user.username}/friends`, icon: Users, label: 'Friends' },
-                        { to: '/watchlist', icon: Heart, label: 'Watchlist' },
-                        { to: '/playlists', icon: ListMusic, label: 'Playlists' },
-                        { to: '/notifications', icon: Bell, label: 'Notifications' },
-                        { to: '/settings', icon: Settings, label: 'Settings' },
+                        { to: '/profile', icon: User, label: 'header.profile' },
+                        { to: '/watchlist', icon: Heart, label: 'header.myList' },
+                        { to: '/notifications', icon: Bell, label: 'header.notifications' },
+                        { to: '/settings', icon: Settings, label: 'header.settings' },
                         ...(user.role === 'ADMIN' || user.role === 'MODERATOR'
-                          ? [{ to: '/admin', icon: LayoutDashboard, label: 'Admin' }]
+                          ? [{ to: '/admin', icon: LayoutDashboard, label: 'header.admin' }]
                           : []),
                       ].map((item) => (
                         <Link key={item.to} to={item.to}
                           className="flex items-center gap-3 px-4 py-2.5 text-sm text-dark-300 hover:text-white hover:bg-dark-800 transition-colors"
                           onClick={() => setUserMenuOpen(false)}>
-                          <item.icon className="h-4 w-4" /> {item.label}
+                          <item.icon className="h-4 w-4" /> {t(item.label)}
                         </Link>
                       ))}
                       <hr className="border-dark-700 my-1" />
                       <button onClick={() => { logout(); setUserMenuOpen(false); }}
                         className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors">
-                        <LogOut className="h-4 w-4" /> Sign Out
+                        <LogOut className="h-4 w-4" /> {t('header.signOut')}
                       </button>
                     </>
                   ) : (
                     <div className="p-3 space-y-2">
                       <Link to="/login" className="block px-4 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/5 rounded-lg transition-colors" onClick={() => setUserMenuOpen(false)}>
-                        Sign In
+                        {t('header.signIn')}
                       </Link>
                       <Link to="/register" className="block px-4 py-2.5 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded-lg font-medium text-center transition-colors" onClick={() => setUserMenuOpen(false)}>
-                        Sign Up
+                        {t('header.signUp')}
                       </Link>
                     </div>
                   )}
@@ -318,14 +333,8 @@ export const Header = () => {
                     <div className="relative flex items-center rounded-full bg-dark-950/70 backdrop-blur-xl px-3.5 py-2.5">
                       <Search className="h-4 w-4 shrink-0 text-white/40 transition-colors group-focus-within:text-primary-400" />
                       <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search"
+placeholder={t('search.placeholder')}
                         className="w-full min-w-0 bg-transparent px-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none" />
-                      {searchQuery && (
-                        <button type="button" onClick={() => setSearchQuery('')}
-                          className="p-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors">
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      )}
                       <span className="mx-1 h-4 w-px bg-white/10" />
                       <button
                         type="button"
@@ -333,7 +342,7 @@ export const Header = () => {
                         className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
                           activeFilterCount > 0 ? 'bg-primary-600/20 text-primary-300' : 'text-white/40 hover:text-white hover:bg-white/10'
                         }`}
-                        title="Filters"
+                        title={t('search.filters')}
                       >
                         <SlidersHorizontal className="h-3.5 w-3.5" />
                         {activeFilterCount > 0 && (
@@ -353,7 +362,7 @@ export const Header = () => {
                 />
               </div>
                <div className="mb-4">
-                 <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-dark-500">Categories</p>
+                 <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-dark-500">{t('footer.categories')}</p>
                  {CATEGORIES.map((cat) => (
                    <Link
                      key={cat.to}
@@ -361,39 +370,43 @@ export const Header = () => {
                      onClick={() => setMenuOpen(false)}
                      className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${isCategoryActive(cat) ? 'bg-white/[0.06] font-semibold text-white' : 'text-dark-200 hover:bg-white/[0.04] hover:text-white'}`}
                    >
-                     <cat.icon className="h-4 w-4" /> {cat.label}
+                     <cat.icon className="h-4 w-4" /> {t(cat.label)}
                    </Link>
                  ))}
-               </div>
-               {MOBILE_NAV_LINKS.map((link) => (
-                 <Link key={link.to} to={link.to}
-                   className="block px-4 py-2.5 text-white/60 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-                   onClick={() => setMenuOpen(false)}>
-                   {link.label}
-                 </Link>
-               ))}
-              {isAuthenticated ? (
+</div>
+               <div className="mb-2 px-4">
+                  <LanguageSwitcher compact />
+                </div>
+                {installable && (
+                  <button
+                    onClick={() => { handleInstall(); setMenuOpen(false); }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-white/60 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                  >
+                    <Download className="h-4 w-4" /> {t('header.installApp')}
+                  </button>
+                )}
+               {isAuthenticated ? (
                 <>
                   <Link to="/settings" className="block px-4 py-2.5 text-white/60 hover:text-white hover:bg-white/5 rounded-lg" onClick={() => setMenuOpen(false)}>
-                    Settings
+                    {t('header.settings')}
                   </Link>
                   {user?.role === 'ADMIN' && (
                     <Link to="/admin" className="block px-4 py-2.5 text-white/60 hover:text-white hover:bg-white/5 rounded-lg" onClick={() => setMenuOpen(false)}>
-                      Admin
+                      {t('header.admin')}
                     </Link>
                   )}
                   <button onClick={() => { logout(); setMenuOpen(false); }}
                     className="block w-full text-left px-4 py-2.5 text-red-400 hover:bg-red-500/10 rounded-lg">
-                    Sign Out
+                    {t('header.signOut')}
                   </button>
                 </>
               ) : (
                 <>
                   <Link to="/login" className="block px-4 py-2.5 text-white/60 hover:text-white hover:bg-white/5 rounded-lg" onClick={() => setMenuOpen(false)}>
-                    Sign In
+                    {t('header.signIn')}
                   </Link>
                   <Link to="/register" className="block px-4 py-2.5 bg-primary-600 text-white text-center rounded-lg font-medium" onClick={() => setMenuOpen(false)}>
-                    Sign Up
+                    {t('header.signUp')}
                   </Link>
                 </>
               )}

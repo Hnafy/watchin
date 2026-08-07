@@ -17,6 +17,7 @@ export interface Media {
   posterUrl?: string; backdropUrl?: string; logoUrl?: string;
   trailerUrl?: string; watchUrl?: string;
   sources?: MediaSource[];
+  hasWatchSource?: boolean;
   releaseDate?: string; firstAirDate?: string; lastAirDate?: string;
   productionYear?: number; runtime?: number;
   numberOfSeasons?: number; numberOfEpisodes?: number;
@@ -38,7 +39,7 @@ export interface Person { id: string; name: string; profilePath?: string; }
 export interface CastMember { id: string; mediaId: string; personId: string; person: Person; character?: string; order: number; }
 export interface Director { id: string; mediaId: string; personId: string; person: Person; order: number; }
 export interface Season { id: string; mediaId: string; seasonNumber: number; name?: string; overview?: string; posterUrl?: string; airDate?: string; episodeCount: number; episodes: Episode[]; }
-export interface Episode { id: string; mediaId: string; seasonId: string; episodeNumber: number; name: string; overview?: string; stillUrl?: string; airDate?: string; runtime?: number; watchUrl?: string; sources?: MediaSource[]; }
+export interface Episode { id: string; mediaId: string; seasonId: string; episodeNumber: number; name: string; overview?: string; stillUrl?: string; airDate?: string; runtime?: number; watchUrl?: string; sources?: MediaSource[]; hasWatchSource?: boolean; }
 
 export interface FacetCount { value: string; count: number; slug?: string; code?: string; }
 
@@ -102,6 +103,7 @@ export interface WatchlistItem {
   id: string;
   mediaId: string;
   media: Media;
+  folderId?: string | null;
   addedAt: string;
 }
 
@@ -123,8 +125,20 @@ export interface Comment {
   content: string;
   createdAt: string;
   updatedAt: string;
-  user: { id: string; username: string; avatar?: string; role?: string };
+  hidden?: boolean;
+  moderationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | 'FLAGGED';
+  reportCount?: number;
+  user: { id: string; username: string; avatar?: string; role?: string; emailVerified?: boolean };
   replies?: Comment[];
+}
+
+export interface CommentConfig {
+  enabled: boolean;
+  requireVerifiedEmail: boolean;
+  profanityFilter: boolean;
+  aiModeration: boolean;
+  maxLength: number;
+  reportThreshold: number;
 }
 
 export interface PlaylistItem {

@@ -9,6 +9,16 @@ export const registerSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .max(128, 'Password must be at most 128 characters'),
+  code: z.string()
+    .regex(/^\d{6}$/, 'Verification code must be 6 digits'),
+});
+
+export const sendVerificationSchema = z.object({
+  email: z.string().email('Invalid email address'),
+});
+
+export const googleLoginSchema = z.object({
+  idToken: z.string().min(1, 'Google token required'),
 });
 
 export const loginSchema = z.object({
@@ -52,58 +62,10 @@ export const userSettingsSchema = z.object({
   }).optional(),
 }).strict();
 
-export const friendRequestSchema = z.object({
-  toUserId: z.string().min(1),
-});
-
-export const followSchema = z.object({
-  followingId: z.string().min(1),
-});
-
-export const profileLikeSchema = z.object({
-  userId: z.string().min(1),
-});
-
 export const searchUsersQuerySchema = z.object({
   q: z.string().min(1).max(100).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(20),
-});
-
-export const playlistSchema = z.object({
-  title: z.string().min(1).max(100),
-  description: z.string().max(1000).optional(),
-  visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
-  items: z.array(z.object({
-    mediaId: z.string().min(1),
-    progress: z.number().min(0).max(100).optional(),
-    rating: z.number().min(1).max(10).optional(),
-    notes: z.string().max(500).optional(),
-  })).optional(),
-});
-
-export const updatePlaylistItemSchema = z.object({
-  progress: z.number().min(0).max(100).optional(),
-  rating: z.number().min(1).max(10).optional(),
-  notes: z.string().max(500).optional(),
-});
-
-export const mediaLikeSchema = z.object({
-  mediaId: z.string().min(1),
-});
-
-export const mediaQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
-  type: z.enum(['MOVIE', 'TV_SHOW', 'ANIME']).optional(),
-  status: z.enum(['RELEASED', 'UPCOMING', 'ONGOING']).optional(),
-  genre: z.string().optional(),
-  country: z.string().optional(),
-  language: z.string().optional(),
-  year: z.coerce.number().int().min(1900).max(2100).optional(),
-  sortBy: z.enum(['popularity', 'imdbRating', 'releaseDate', 'title', 'viewCount']).default('popularity'),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
-  search: z.string().optional(),
 });
 
 export const createMediaSchema = z.object({
@@ -134,15 +96,6 @@ export const createMediaSchema = z.object({
   countries: z.array(z.string()).optional(),
   languages: z.array(z.string()).optional(),
   keywords: z.array(z.string()).optional(),
-  cast: z.array(z.object({
-    personId: z.string(),
-    character: z.string(),
-    order: z.number().int().default(0),
-  })).optional(),
-  directors: z.array(z.object({
-    personId: z.string(),
-    order: z.number().int().default(0),
-  })).optional(),
   seasons: z.array(z.object({
     seasonNumber: z.number().int().positive(),
     name: z.string().optional(),
@@ -173,6 +126,18 @@ export const rateMediaSchema = z.object({
 
 export const addToWatchlistSchema = z.object({
   mediaId: z.string().min(1),
+  folderId: z.string().min(1).optional().nullable(),
+});
+
+export const folderSchema = z.object({
+  name: z.string().min(1).max(60),
+  icon: z.string().max(40).optional().nullable(),
+});
+
+export const folderNameSchema = folderSchema;
+
+export const moveToFolderSchema = z.object({
+  folderId: z.string().min(1).optional().nullable(),
 });
 
 export const updateProgressSchema = z.object({

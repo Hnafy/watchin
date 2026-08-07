@@ -74,7 +74,9 @@ api.interceptors.response.use(
 export default api;
 
 export const authApi = {
-  register: (data: { email: string; username: string; password: string }) => api.post('/auth/register', data),
+  register: (data: { email: string; username: string; password: string; code: string }) => api.post('/auth/register', data),
+  sendVerification: (email: string) => api.post('/auth/send-verification', { email }),
+  googleLogin: (idToken: string) => api.post('/auth/google', { idToken }),
   login: (data: { email: string; password: string }) => api.post('/auth/login', data),
   logout: () => api.post('/auth/logout', { refreshToken: getRefreshToken() }),
   getMe: () => api.get('/auth/me'),
@@ -84,6 +86,8 @@ export const mediaApi = {
   getList: (params: Record<string, unknown>) => api.get('/media', { params }),
   getById: (id: string) => api.get(`/media/${id}`),
   getBySlug: (slug: string) => api.get(`/media/slug/${slug}`),
+  getWatchSource: (id: string, episodeId?: string) =>
+    api.get(`/media/source/${id}`, { params: episodeId ? { episodeId } : undefined }),
   getTrending: (params: Record<string, unknown>) => api.get('/media/trending', { params }),
   getTopRated: (params: Record<string, unknown>) => api.get('/media/top-rated', { params }),
   getLatest: (params: Record<string, unknown>) => api.get('/media/latest', { params }),
@@ -98,15 +102,21 @@ export const mediaApi = {
   getLanguages: () => api.get('/media/languages'),
   getKeywords: () => api.get('/media/keywords'),
   searchAndFilter: (filters: Record<string, unknown>) => api.get('/media/browse', { params: filters }),
-  searchPeople: (q: string, limit = 10) => api.get('/media/people/search', { params: { search: q, limit } }),
 };
 
 export const watchlistApi = {
-  getList: (page = 1, limit = 20) => api.get('/watchlist', { params: { page, limit } }),
-  add: (mediaId: string) => api.post('/watchlist', { mediaId }),
+  getList: (page = 1, limit = 20, folderId?: string) =>
+    api.get('/watchlist', { params: { page, limit, folderId } }),
+  add: (mediaId: string, folderId?: string | null) => api.post('/watchlist', { mediaId, folderId }),
   remove: (mediaId: string) => api.delete(`/watchlist/${mediaId}`),
+  moveToFolder: (mediaId: string, folderId?: string | null) => api.patch(`/watchlist/${mediaId}/folder`, { folderId }),
   check: (mediaId: string) => api.get(`/watchlist/${mediaId}/check`),
   clearAll: () => api.delete('/watchlist'),
+  getFolders: () => api.get('/watchlist/folders'),
+  createFolder: (name: string, icon?: string | null) => api.post('/watchlist/folders', { name, icon }),
+  renameFolder: (folderId: string, name: string, icon?: string | null) =>
+    api.patch(`/watchlist/folders/${folderId}`, { name, icon }),
+  deleteFolder: (folderId: string) => api.delete(`/watchlist/folders/${folderId}`),
 };
 
 export const ratingApi = {
@@ -137,16 +147,6 @@ export const userApi = {
   getProfile: (username: string) => api.get(`/user/profile/${username}`),
   searchUsers: (q: string, page = 1, limit = 20) =>
     api.get('/user/users/search', { params: { q, page, limit } }),
-  getUserFriends: (username: string, mode: 'friends' | 'following' | 'followers') =>
-    api.get(`/user/friends/${username}`, { params: { mode } }),
-  toggleFollow: (followingId: string) => api.post('/user/follow', { followingId }),
-  getFollowStats: () => api.get('/user/follow-stats'),
-  sendFriendRequest: (toUserId: string) => api.post('/user/friend-requests', { toUserId }),
-  respondFriendRequest: (requestId: string, action: 'accept' | 'decline') =>
-    api.patch(`/user/friend-requests/${requestId}/respond`, { action }),
-  cancelFriendRequest: (requestId: string) => api.delete(`/user/friend-requests/${requestId}/cancel`),
-  removeFriend: (friendId: string) => api.delete('/user/friends', { data: { friendId } }),
-  likeProfile: (userId: string) => api.post('/user/like-profile', { userId }),
 };
 
 export const notificationApi = {
@@ -160,26 +160,6 @@ export const searchApi = {
   suggest: (q: string, limit = 6) => api.get('/media/suggest', { params: { q, limit } }),
   trendingSearches: () => api.get('/media/trending-searches'),
   track: (query: string) => api.post('/media/search/track', { query }).catch(() => null),
-};
-
-export const playlistApi = {
-  list: (page = 1, limit = 20, search?: string, sortBy = 'trending') =>
-    api.get('/playlists', { params: { page, limit, search, sortBy } }),
-  trending: (limit = 10) => api.get('/playlists/trending', { params: { limit } }),
-  getMine: () => api.get('/playlists/mine'),
-  getById: (playlistId: string) => api.get(`/playlists/${playlistId}`),
-  create: (data: { title: string; description?: string; visibility?: 'PUBLIC' | 'PRIVATE' }) =>
-    api.post('/playlists', data),
-  update: (playlistId: string, data: Record<string, unknown>) =>
-    api.patch(`/playlists/${playlistId}`, data),
-  remove: (playlistId: string) => api.delete(`/playlists/${playlistId}`),
-  addItem: (playlistId: string, mediaId: string) =>
-    api.post(`/playlists/${playlistId}/items`, { mediaId }),
-  removeItem: (playlistId: string, mediaId: string) =>
-    api.delete(`/playlists/${playlistId}/items/${mediaId}`),
-  like: (playlistId: string) => api.post(`/playlists/${playlistId}/like`),
-  save: (playlistId: string) => api.post(`/playlists/${playlistId}/save`),
-  fork: (playlistId: string) => api.post(`/playlists/${playlistId}/fork`),
 };
 
 export const adminApi = {
@@ -201,9 +181,21 @@ export const adminApi = {
     api.get('/admin/users', { params: { page, limit, search } }),
   updateUserRole: (id: string, role: string) => api.patch(`/admin/users/${id}/role`, { role }),
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
-  getAllComments: (page = 1, limit = 20, search?: string) =>
-    api.get('/admin/comments', { params: { page, limit, search } }),
+  getAllComments: (page = 1, limit = 20, search?: string, filter = 'all') =>
+    api.get('/admin/comments', { params: { page, limit, search, filter } }),
+  getBlockedEmails: () => api.get('/admin/blocked-emails'),
+  addBlockedEmail: (email: string, note?: string) => api.post('/admin/blocked-emails', { email, note }),
+  removeBlockedEmail: (id: string) => api.delete(`/admin/blocked-emails/${id}`),
   deleteComment: (id: string) => api.delete(`/admin/comments/${id}`),
+  getCommentSettings: () => api.get('/admin/comments/settings'),
+  updateCommentSettings: (key: string, value: unknown) => api.put('/admin/comments/settings', { key, value }),
+  setCommentHidden: (id: string, hidden: boolean) => api.patch(`/admin/comments/${id}/hidden`, { hidden }),
+  updateUserVerified: (id: string, emailVerified: boolean) =>
+    api.patch(`/admin/users/${id}/verify`, { emailVerified }),
+  sendUserMessage: (id: string, data: { title?: string; body: string }) =>
+    api.post(`/admin/users/${id}/message`, data),
+  warnUser: (id: string, reason?: string) => api.post(`/admin/users/${id}/warn`, { reason }),
+  warnCommentReporters: (commentId: string) => api.post(`/admin/comments/${commentId}/warn-reporters`),
   getSettings: (group?: string) => api.get('/admin/settings', { params: { group } }),
   updateSetting: (key: string, value: any, label?: string, group?: string) =>
     api.put('/admin/settings', { key, value, label, group }),
@@ -239,7 +231,14 @@ export const mixdropApi = {
 export const commentApi = {
   getByMedia: (mediaId: string, page = 1, limit = 20) =>
     api.get(`/comments/media/${mediaId}`, { params: { page, limit } }),
+  getConfig: () => api.get('/comments/config'),
   add: (mediaId: string, content: string) => api.post(`/comments/media/${mediaId}`, { content }),
   reply: (commentId: string, content: string) => api.post(`/comments/${commentId}/reply`, { content }),
+  report: (commentId: string, reason: string) => api.post(`/comments/${commentId}/report`, { reason }),
   remove: (commentId: string) => api.delete(`/comments/${commentId}`),
+};
+
+export const supportApi = {
+  contact: (data: { message: string; subject?: string; pageUrl?: string }) =>
+    api.post('/support/contact', data),
 };

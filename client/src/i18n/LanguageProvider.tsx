@@ -5,6 +5,7 @@ import {
   DEFAULT_LANGUAGE,
   STORAGE_KEY,
   getInitialLanguage,
+  setStoredLanguage,
   getDir,
 } from './config';
 
@@ -16,24 +17,31 @@ interface LanguageContextType {
   language: LanguageCode;
   dir: 'ltr' | 'rtl';
   t: TranslateFn;
+  setLanguage: (code: LanguageCode) => void;
 }
 
 const LanguageContext = createContext<LanguageContextType>({
   language: DEFAULT_LANGUAGE,
   dir: 'ltr',
   t: (key) => key,
+  setLanguage: () => {},
 });
 
 export const useI18n = () => useContext(LanguageContext);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language] = useState<LanguageCode>(() => getInitialLanguage());
+  const [language, setLanguageState] = useState<LanguageCode>(() => getInitialLanguage());
 
   useEffect(() => {
     const dir = getDir(language);
     document.documentElement.lang = language;
     document.documentElement.dir = dir;
   }, [language]);
+
+  const setLanguage = useCallback((code: LanguageCode) => {
+    setStoredLanguage(code);
+    setLanguageState(code);
+  }, []);
 
   const t = useCallback<TranslateFn>((key, vars) => {
     const dict = DICTIONARIES[language] ?? DICTIONARIES[DEFAULT_LANGUAGE];
@@ -47,8 +55,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [language]);
 
   const value = useMemo(
-    () => ({ language, dir: getDir(language), t }),
-    [language, t]
+    () => ({ language, dir: getDir(language), t, setLanguage }),
+    [language, t, setLanguage]
   );
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;

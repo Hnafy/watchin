@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, Trash2, Loader2, Calendar, User, Music } from 'lucide-react';
+import { Bell, Check, Trash2, Loader2, Calendar, User, Music, MessageSquare, Flag, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationApi } from '../services/api';
 import { useI18n } from '../i18n/LanguageProvider';
 import { SEOPage } from '../components/SEO';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 interface Notification {
@@ -29,6 +30,7 @@ export function NotificationsPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
   const { data, isLoading } = useQuery({
@@ -71,6 +73,12 @@ export function NotificationsPage() {
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
+      case 'MESSAGE':
+        return <MessageSquare className="h-4 w-4 text-sky-400" />;
+      case 'REPORT':
+        return <Flag className="h-4 w-4 text-amber-400" />;
+      case 'WARNING':
+        return <AlertTriangle className="h-4 w-4 text-red-400" />;
       case 'FRIEND_REQUEST':
         return <User className="h-4 w-4 text-blue-400" />;
       case 'FOLLOW':
@@ -86,6 +94,12 @@ export function NotificationsPage() {
 
   const getNotificationColor = (type: string) => {
     switch (type) {
+      case 'MESSAGE':
+        return 'bg-sky-500/10 border-sky-500/30';
+      case 'REPORT':
+        return 'bg-amber-500/10 border-amber-500/30';
+      case 'WARNING':
+        return 'bg-red-500/10 border-red-500/30';
       case 'FRIEND_REQUEST':
         return 'bg-blue-500/10 border-blue-500/30';
       case 'FOLLOW':
@@ -199,10 +213,18 @@ export function NotificationsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                   transition={{ duration: 0.2 }}
-                  className={`glass-card p-5 flex items-start gap-4 hover:bg-white/[0.03] transition-all ${
+                  className={`glass-card p-5 flex items-start gap-4 hover:bg-white/[0.03] transition-all cursor-pointer ${
                     !notification.read ? 'border-l-4' : ''
                   }`}
                   style={{ borderColor: !notification.read ? 'var(--color-primary-500)' : undefined }}
+                  onClick={() => {
+                    if (notification.link) {
+                      if (!notification.read) markReadMutation.mutate(notification.id);
+                      navigate(notification.link);
+                    } else if (!notification.read) {
+                      markReadMutation.mutate(notification.id);
+                    }
+                  }}
                 >
                   <div className={`h-10 w-10 rounded-full flex items-center justify-center ${getNotificationColor(notification.type)}`}>
                     {getNotificationIcon(notification.type)}
