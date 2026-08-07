@@ -10,7 +10,7 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   
   db: {
-    url: process.env.MONGODB_URI || 'mongodb://localhost:27017/streaming',
+    url: process.env.MONGODB_URI || 'mongodb+srv://abdallahalfeky18_db_user:YZ2rhhJaDdSgXOMQ@watchin.rmxdal3.mongodb.net',
   },
   
   jwt: {
