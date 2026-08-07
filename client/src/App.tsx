@@ -8,7 +8,6 @@ import { LanguageProvider } from './i18n/LanguageProvider';
 import { Header } from './components/layout/Header';
 import { ScrollToTop } from './components/ui/ScrollToTop';
 import { Home } from './pages/Home';
-import { About } from './pages/About';
 import { MediaDetail } from './pages/MediaDetail';
 import { Watch } from './pages/Watch';
 import { Login } from './pages/Auth/Login';
@@ -16,10 +15,15 @@ import { Register } from './pages/Auth/Register';
 import { Search } from './pages/Search';
 import { Watchlist } from './pages/Watchlist';
 import { Profile } from './pages/Profile';
-import { ProfileFriends } from './pages/ProfileFriends';
 import { Settings } from './pages/Settings';
 import { HistoryPage } from './pages/History';
 import { NotificationsPage } from './pages/Notifications';
+import { UserProfile } from './pages/UserProfile';
+import { ProfileFriends } from './pages/ProfileFriends';
+import { UsersPage } from './pages/Users';
+import { PlaylistsListPage } from './pages/Playlists/PlaylistsListPage';
+import { PlaylistPage } from './pages/Playlists/PlaylistPage';
+import { CreatePlaylistPage } from './pages/Playlists/CreatePlaylistPage';
 import { AdminDashboard } from './pages/Admin/Dashboard';
 import { AdminMediaForm } from './pages/Admin/MediaForm';
 import { AdminMediaManager } from './pages/Admin/MediaManager';
@@ -78,7 +82,6 @@ function AnimatedRoutes() {
       >
         <Routes location={location}>
           <Route path="/" element={<Home />} />
-          <Route path="/about" element={<About />} />
           <Route path="/movies" element={<Home />} />
           <Route path="/tv-shows" element={<Home />} />
           <Route path="/trending" element={<Home />} />
@@ -89,12 +92,17 @@ function AnimatedRoutes() {
           <Route path="/register" element={<Register />} />
           <Route path="/watchlist" element={<ProtectedRoute><Watchlist /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/profile/:username/friends" element={<ProtectedRoute><ProfileFriends /></ProtectedRoute>} />
-          <Route path="/profile/:username/following" element={<ProtectedRoute><ProfileFriends /></ProtectedRoute>} />
-          <Route path="/profile/:username/followers" element={<ProtectedRoute><ProfileFriends /></ProtectedRoute>} />
+          <Route path="/user/:username" element={<UserProfile />} />
+          <Route path="/user/:username/friends" element={<ProfileFriends />} />
+          <Route path="/user/:username/friends/:tab" element={<ProfileFriends />} />
+          <Route path="/users" element={<UsersPage />} />
           <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/playlists" element={<PlaylistsListPage />} />
+          <Route path="/playlists/new" element={<ProtectedRoute><CreatePlaylistPage /></ProtectedRoute>} />
+          <Route path="/playlists/:playlistId" element={<PlaylistPage />} />
+          <Route path="/playlists/:playlistId/edit" element={<ProtectedRoute><CreatePlaylistPage /></ProtectedRoute>} />
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
 
           <Route path="/admin/media" element={<AdminRoute><AdminMediaManager /></AdminRoute>} />

@@ -10,6 +10,7 @@ import {
 } from "framer-motion";
 import { mediaApi, tmdbApi } from "../services/api";
 import { Media } from "../types";
+import { SEOPage, MovieSchema, TVSeriesSchema } from '../components/SEO';
 import {
   Play,
   Clock,
@@ -490,7 +491,70 @@ export function MediaDetail() {
   );
 
   return (
-    <div className="min-h-screen">
+    <>
+      {media && (
+        <>
+          <SEOPage
+            title={`${media.title} (${media.productionYear || new Date().getFullYear()}) — Watch ${media.type === 'MOVIE' ? 'Movie' : 'TV Show'} Online`}
+            description={media.shortDescription || media.overview?.slice(0, 160) || `Watch ${media.title} online in 4K HDR. ${media.type === 'MOVIE' ? 'Movie' : 'TV Show'} streaming in premium quality.`}
+            canonical={`/media/${media.slug}`}
+            ogType={media.type === 'MOVIE' ? 'video.movie' : 'video.tv_show'}
+            ogImage={media.backdropUrl || media.posterUrl}
+structuredData={
+              media.type === 'MOVIE'
+                ? {
+                    '@context': 'https://schema.org',
+                    '@type': 'Movie',
+                    '@id': `https://watchin.app/media/${media.slug}#movie`,
+                    name: media.title,
+                    description: media.overview,
+                    image: media.backdropUrl || media.posterUrl,
+                    trailer: media.trailerUrl ? { '@type': 'VideoObject', contentUrl: media.trailerUrl } : undefined,
+                    datePublished: media.releaseDate,
+                    duration: media.runtime ? `PT${media.runtime}M` : undefined,
+                    director: media.directors?.map(d => ({ '@type': 'Person', name: d.person.name })),
+                    actor: media.cast?.map(c => ({ '@type': 'Person', name: c.person.name })),
+                    genre: media.genres?.map(g => g.name),
+                    aggregateRating: media.imdbRating ? {
+                      '@type': 'AggregateRating',
+                      ratingValue: media.imdbRating,
+                      bestRating: 10,
+                      worstRating: 1,
+                    } : undefined,
+                    contentRating: 'PG-13',
+                  }
+                : {
+                    '@context': 'https://schema.org',
+                    '@type': 'TVSeries',
+                    '@id': `https://watchin.app/media/${media.slug}#series`,
+                    name: media.title,
+                    description: media.overview,
+                    image: media.backdropUrl || media.posterUrl,
+                    trailer: media.trailerUrl ? { '@type': 'VideoObject', contentUrl: media.trailerUrl } : undefined,
+                    datePublished: media.firstAirDate,
+                    numberOfSeasons: media.numberOfSeasons,
+                    numberOfEpisodes: media.numberOfEpisodes,
+                    director: media.directors?.map(d => ({ '@type': 'Person', name: d.person.name })),
+                    actor: media.cast?.map(c => ({ '@type': 'Person', name: c.person.name })),
+                    genre: media.genres?.map(g => g.name),
+                    aggregateRating: media.imdbRating ? {
+                      '@type': 'AggregateRating',
+                      ratingValue: media.imdbRating,
+                      bestRating: 10,
+                      worstRating: 1,
+                    } : undefined,
+                    contentRating: 'TV-14',
+                  }
+              }
+            breadcrumbItems={[
+              { name: 'Home', url: '/' },
+              { name: media.type === 'MOVIE' ? 'Movies' : 'TV Shows', url: media.type === 'MOVIE' ? '/movies' : '/tv-shows' },
+              { name: media.title, url: `/media/${media.slug}` },
+            ]}
+          />
+        </>
+      )}
+      <div className="min-h-screen">
       {/* ===== BACKDROP HERO ===== */}
       <div ref={heroRef} className="relative overflow-hidden">
         {media.backdropUrl && (
@@ -1349,5 +1413,6 @@ export function MediaDetail() {
         )}
       </AnimatePresence>
     </div>
+  </>
   );
 }

@@ -20,6 +20,7 @@ import { API_URL } from '../services/api';
 import { MediaCarousel } from '../components/media/MediaCarousel';
 import { Chip } from '../components/ui/Chip';
 import { Media } from '../types';
+import { SEOPage } from '../components/SEO';
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -277,8 +278,25 @@ export function Home() {
      toast.success('Added to your likes');
    };
 
-   return (
-    <div className="min-h-screen">
+return (
+    <>
+      <SEOPage
+        title="Watchin — Premium Streaming for Movies, TV Shows & Anime"
+        description="Stream movies, TV shows, and anime in 4K HDR. Personalized recommendations, watchlists, and seamless playback across devices."
+        canonical="/"
+        structuredData={{
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: 'Watchin',
+          url: 'https://watchin.app',
+          potentialAction: {
+            '@type': 'SearchAction',
+            target: { '@type': 'EntryPoint', urlTemplate: 'https://watchin.app/search?q={search_term_string}' },
+            'query-input': 'required name=search_term_string',
+          },
+        }}
+      />
+      <div className="min-h-screen">
       <Hero />
 
 <div className="pb-20">
@@ -489,11 +507,12 @@ export function Home() {
                  className="pt-6"
                />
              )}
-             <GenreSections onItemClick={goToMedia} onBrowse={goBrowse} typeFilter="TV_SHOW" onPlay={handlePlay} onAddToList={handleAddToList} onLike={handleLike} />
-           </>
-         )}
-      </div>
-    </div>
+<GenreSections onItemClick={goToMedia} onBrowse={goBrowse} typeFilter="TV_SHOW" onPlay={handlePlay} onAddToList={handleAddToList} onLike={handleLike} />
+            </>
+          )}
+       </div>
+     </div>
+   </>
   );
 }
 

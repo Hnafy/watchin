@@ -4,14 +4,15 @@ import { adminApi } from '../../services/api';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Film, Users, Clock, TrendingUp, Plus, Eye, BarChart3, Settings, ChevronLeft, ChevronRight,
-  Star, Heart, Trash2, Edit, Search, ArrowUpRight, ArrowDownRight, Activity, Radio, Megaphone,
+  Film, Users, Clock, TrendingUp, Plus, Eye, BarChart3, ChevronLeft, ChevronRight,
+  Star, Heart, Trash2, Edit, Search, ArrowUpRight, ArrowDownRight, Activity, Radio,
+  MessageSquare,
 } from 'lucide-react';
 import { ConfirmModal } from '../../components/ui/Modal';
 import { useI18n } from '../../i18n/LanguageProvider';
 import toast from 'react-hot-toast';
 
-type Tab = 'overview' | 'content' | 'users' | 'settings';
+type Tab = 'overview' | 'content' | 'users' | 'comments';
 
 const iconBg: Record<string, string> = {
   blue: 'from-blue-500/30 to-blue-500/0 text-blue-400 ring-blue-400/20',
@@ -398,23 +399,119 @@ function UsersTab() {
   );
 }
 
-function SettingsTab() {
+function CommentsTab() {
+  const qc = useQueryClient();
   const { t } = useI18n();
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'comments', page, search],
+    queryFn: () => adminApi.getAllComments(page, 15, search),
+    select: (r) => r.data,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => adminApi.deleteComment(id),
+    onSuccess: () => {
+      toast.success(t('admin.commentDeleted'));
+      qc.invalidateQueries({ queryKey: ['admin', 'comments'] });
+      setDeleteId(null);
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message || t('admin.failed')),
+  });
+
+  const items = data?.data || [];
+  const pagination = data?.pagination;
+
   return (
-    <div className="space-y-6">
-      <div className="card p-6 glass">
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2"><Activity className="h-5 w-5" /> {t('admin.siteHealth')}</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="p-4 rounded-lg bg-dark-800">
-            <p className="text-sm text-dark-400">{t('admin.serverStatus')}</p>
-            <p className="text-lg font-bold text-green-600 mt-1">{t('admin.operational')}</p>
-          </div>
-          <div className="p-4 rounded-lg bg-dark-800">
-            <p className="text-sm text-dark-400">{t('admin.database')}</p>
-            <p className="text-lg font-bold text-green-600 mt-1">{t('admin.connected')}</p>
-          </div>
-        </div>
+    <div className="space-y-4">
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-dark-400" />
+        <input type="search" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          placeholder={t('admin.searchComments')} className="input pl-10" />
       </div>
+
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-dark-700 bg-dark-950/50">
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase">{t('admin.author')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase">{t('admin.comment')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase hidden md:table-cell">{t('admin.onMedia')}</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-dark-400 uppercase hidden sm:table-cell">{t('admin.date')}</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-dark-400 uppercase">{t('admin.actions')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-dark-700">
+              {isLoading ? (
+                <tr><td colSpan={5} className="px-4 py-12 text-center text-dark-500">{t('admin.loading')}</td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan={5} className="px-4 py-12 text-center text-dark-500">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-3 text-dark-600" />
+                  <p className="font-medium">{t('admin.noComments')}</p>
+                </td></tr>
+              ) : items.map((c: any) => (
+                <tr key={c._id || c.id} className="hover:bg-dark-900/50 transition-colors group">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      {c.user?.avatar ? <img src={c.user.avatar} alt="" className="h-8 w-8 rounded-full" /> :
+                        <div className="h-8 w-8 rounded-full bg-primary-900/30 flex items-center justify-center text-primary-400 text-sm font-bold">
+                          {(c.user?.username?.[0] || '?').toUpperCase()}
+                        </div>}
+                      <div>
+                        <p className="font-medium text-sm">{c.user?.username || t('admin.unknownUser')}</p>
+                        <p className="text-xs text-dark-400">{c.user?.role?.toLowerCase()}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-sm max-w-xs line-clamp-2 text-dark-200">{c.content}</p>
+                    {c.parentId && <p className="mt-1 text-[10px] uppercase tracking-wider text-dark-500">{t('admin.reply')}</p>}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {c.mediaId ? (
+                      <Link to={`/media/${c.mediaId.slug}`} className="text-sm text-primary-400 hover:underline">
+                        {c.mediaId.title}
+                      </Link>
+                    ) : <span className="text-sm text-dark-500">—</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-sm text-dark-500">{new Date(c.createdAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => setDeleteId(c._id || c.id)} className="p-1.5 rounded-lg hover:bg-red-900/20 text-red-500 transition-colors" title={t('admin.delete')}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {pagination && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-dark-700">
+            <span className="text-sm text-dark-400">{t('admin.commentsCount', { count: pagination.total })}</span>
+            <div className="flex gap-2">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="p-1.5 rounded-lg hover:bg-dark-800 disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="text-sm py-1 px-3">{page} / {pagination.totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))} disabled={page === pagination.totalPages}
+                className="p-1.5 rounded-lg hover:bg-dark-800 disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ConfirmModal
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+        title={t('admin.deleteComment')}
+        message={t('admin.deleteCommentMsg')}
+        confirmLabel={t('admin.delete')}
+        loading={deleteMutation.isPending}
+      />
     </div>
   );
 }
@@ -456,7 +553,7 @@ export function AdminDashboard() {
     { key: 'overview', label: t('admin.overview'), icon: BarChart3 },
     { key: 'content', label: t('admin.content'), icon: Film },
     { key: 'users', label: t('admin.users'), icon: Users },
-    { key: 'settings', label: t('admin.settings'), icon: Settings },
+    { key: 'comments', label: t('admin.comments'), icon: MessageSquare },
   ];
 
   const viewChange = stats?.todayViews && stats?.yesterdayViews
@@ -487,7 +584,6 @@ export function AdminDashboard() {
             <p className="mt-2 text-dark-400">{t('admin.dashboardSubtitle')}</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Link to="/admin/settings/ads" className="btn btn-glass"><Megaphone className="h-4 w-4" /> {t('admin.adSettings')}</Link>
             <Link to="/admin/tmdb-import" className="btn btn-glass"><Search className="h-4 w-4" /> {t('admin.tmdbImport')}</Link>
             <Link to="/admin/media/new" className="btn btn-primary"><Plus className="h-4 w-4" /> {t('admin.addMedia')}</Link>
           </div>
@@ -578,7 +674,7 @@ export function AdminDashboard() {
 
         {activeTab === 'content' && <ContentTab />}
         {activeTab === 'users' && <UsersTab />}
-        {activeTab === 'settings' && <SettingsTab />}
+        {activeTab === 'comments' && <CommentsTab />}
       </div>
     </div>
   );

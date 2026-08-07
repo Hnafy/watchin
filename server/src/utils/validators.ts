@@ -50,18 +50,24 @@ export const userSettingsSchema = z.object({
     showWatchHistory: settingsBool,
     showStats: settingsBool,
   }).optional(),
-  playback: z.object({
-    autoplay: settingsBool,
-    resume: settingsBool,
-    defaultQuality: z.enum(['auto', '1080p', '720p', '480p']).optional(),
-  }).optional(),
-  appearance: z.object({
-    reduceMotion: settingsBool,
-  }).optional(),
 }).strict();
 
 export const friendRequestSchema = z.object({
   toUserId: z.string().min(1),
+});
+
+export const followSchema = z.object({
+  followingId: z.string().min(1),
+});
+
+export const profileLikeSchema = z.object({
+  userId: z.string().min(1),
+});
+
+export const searchUsersQuerySchema = z.object({
+  q: z.string().min(1).max(100).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(50).default(20),
 });
 
 export const playlistSchema = z.object({

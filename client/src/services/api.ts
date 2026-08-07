@@ -134,11 +134,19 @@ export const userApi = {
   getSettings: () => api.get('/user/settings'),
   updateSettings: (data: Record<string, unknown>) => api.patch('/user/settings', data),
   deleteAccount: () => api.delete('/user/account'),
-  getProfile: (username: string) => api.get(`/profile/${username}`),
-  getUserFriends: (username: string, mode: string) => api.get(`/profile/${username}/${mode}`),
-  getNotifications: () => api.get('/notifications'),
-  markNotificationAsRead: (notificationId: string) => api.patch(`/notifications/${notificationId}/read`),
-  deleteAllReadNotifications: () => api.delete('/notifications/read-all'),
+  getProfile: (username: string) => api.get(`/user/profile/${username}`),
+  searchUsers: (q: string, page = 1, limit = 20) =>
+    api.get('/user/users/search', { params: { q, page, limit } }),
+  getUserFriends: (username: string, mode: 'friends' | 'following' | 'followers') =>
+    api.get(`/user/friends/${username}`, { params: { mode } }),
+  toggleFollow: (followingId: string) => api.post('/user/follow', { followingId }),
+  getFollowStats: () => api.get('/user/follow-stats'),
+  sendFriendRequest: (toUserId: string) => api.post('/user/friend-requests', { toUserId }),
+  respondFriendRequest: (requestId: string, action: 'accept' | 'decline') =>
+    api.patch(`/user/friend-requests/${requestId}/respond`, { action }),
+  cancelFriendRequest: (requestId: string) => api.delete(`/user/friend-requests/${requestId}/cancel`),
+  removeFriend: (friendId: string) => api.delete('/user/friends', { data: { friendId } }),
+  likeProfile: (userId: string) => api.post('/user/like-profile', { userId }),
 };
 
 export const notificationApi = {
@@ -152,6 +160,26 @@ export const searchApi = {
   suggest: (q: string, limit = 6) => api.get('/media/suggest', { params: { q, limit } }),
   trendingSearches: () => api.get('/media/trending-searches'),
   track: (query: string) => api.post('/media/search/track', { query }).catch(() => null),
+};
+
+export const playlistApi = {
+  list: (page = 1, limit = 20, search?: string, sortBy = 'trending') =>
+    api.get('/playlists', { params: { page, limit, search, sortBy } }),
+  trending: (limit = 10) => api.get('/playlists/trending', { params: { limit } }),
+  getMine: () => api.get('/playlists/mine'),
+  getById: (playlistId: string) => api.get(`/playlists/${playlistId}`),
+  create: (data: { title: string; description?: string; visibility?: 'PUBLIC' | 'PRIVATE' }) =>
+    api.post('/playlists', data),
+  update: (playlistId: string, data: Record<string, unknown>) =>
+    api.patch(`/playlists/${playlistId}`, data),
+  remove: (playlistId: string) => api.delete(`/playlists/${playlistId}`),
+  addItem: (playlistId: string, mediaId: string) =>
+    api.post(`/playlists/${playlistId}/items`, { mediaId }),
+  removeItem: (playlistId: string, mediaId: string) =>
+    api.delete(`/playlists/${playlistId}/items/${mediaId}`),
+  like: (playlistId: string) => api.post(`/playlists/${playlistId}/like`),
+  save: (playlistId: string) => api.post(`/playlists/${playlistId}/save`),
+  fork: (playlistId: string) => api.post(`/playlists/${playlistId}/fork`),
 };
 
 export const adminApi = {
@@ -173,6 +201,9 @@ export const adminApi = {
     api.get('/admin/users', { params: { page, limit, search } }),
   updateUserRole: (id: string, role: string) => api.patch(`/admin/users/${id}/role`, { role }),
   deleteUser: (id: string) => api.delete(`/admin/users/${id}`),
+  getAllComments: (page = 1, limit = 20, search?: string) =>
+    api.get('/admin/comments', { params: { page, limit, search } }),
+  deleteComment: (id: string) => api.delete(`/admin/comments/${id}`),
   getSettings: (group?: string) => api.get('/admin/settings', { params: { group } }),
   updateSetting: (key: string, value: any, label?: string, group?: string) =>
     api.put('/admin/settings', { key, value, label, group }),

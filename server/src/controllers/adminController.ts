@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { TrendingMedia, AdEvent } from '../db/models.js';
 import { analyticsService } from '../services/analyticsService.js';
 import { adminService } from '../services/adminService.js';
+import { commentService } from '../services/commentService.js';
 import { AuthRequest } from '../middleware/authMiddleware.js';
 
 export const adminController = {
@@ -217,6 +218,24 @@ export const adminController = {
     try {
       await adminService.rejectMedia(req.params.id, req.user!.id);
       res.json({ status: 'success', message: 'Media rejected' });
+    } catch (error) { next(error); }
+  },
+
+  // --- Comment Moderation ---
+  async getAllComments(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const search = typeof req.query.search === 'string' ? req.query.search : '';
+      const result = await commentService.getAll(page, limit, search);
+      res.json({ status: 'success', ...result });
+    } catch (error) { next(error); }
+  },
+
+  async deleteComment(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      await commentService.remove(req.params.id, req.user!.id, req.user!.role);
+      res.json({ status: 'success', message: 'Comment deleted' });
     } catch (error) { next(error); }
   },
 };

@@ -1,4 +1,5 @@
 import { Comment, Media, isValidId } from '../db/models.js';
+import { escapeRegex } from '../db/utils.js';
 import { AppError } from '../utils/AppError.js';
 
 const REPLIES_POPULATE = {
@@ -8,6 +9,29 @@ const REPLIES_POPULATE = {
 };
 
 export const commentService = {
+  async getAll(page = 1, limit = 20, search = '') {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (search) {
+      where.content = { $regex: escapeRegex(search), $options: 'i' };
+    }
+
+    const [comments, total] = await Promise.all([
+      Comment.find(where)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Math.min(limit, 50))
+        .populate({ path: 'user', select: 'username avatar role' })
+        .populate({ path: 'mediaId', select: 'title slug posterUrl type' }),
+      Comment.countDocuments(where),
+    ]);
+
+    return {
+      data: comments,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  },
+
   async getByMedia(mediaId: string, page = 1, limit = 20) {
     if (!isValidId(mediaId)) throw AppError.badRequest('Invalid media id');
     const skip = (page - 1) * limit;

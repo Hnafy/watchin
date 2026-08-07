@@ -43,4 +43,14 @@ export const notificationController = {
       next(error);
     }
   },
+
+  async deleteAllRead(req: Request, res: Response, next: NextFunction) {
+    try {
+      const userId = (req as any).user.id;
+      const result = await Notification.deleteMany({ userId, read: true });
+      res.json({ status: 'success', data: { deleted: result.deletedCount } });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

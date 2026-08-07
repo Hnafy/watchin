@@ -126,3 +126,36 @@ export interface Comment {
   user: { id: string; username: string; avatar?: string; role?: string };
   replies?: Comment[];
 }
+
+export interface PlaylistItem {
+  id: string;
+  mediaId: Media;
+  addedAt: string;
+  progress: number;
+  rating: number | null;
+  notes: string | null;
+}
+
+export interface Playlist {
+  id: string;
+  title: string;
+  description: string | null;
+  coverImage: string | null;
+  userId: string;
+  user: { id: string; username: string; avatar?: string; role?: string };
+  visibility: 'PUBLIC' | 'PRIVATE';
+  items: PlaylistItem[];
+  likes: string[];
+  likeCount: number;
+  saves: string[];
+  saveCount: number;
+  forkedFrom: string | null;
+  forkCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginatedPlaylists {
+  data: Playlist[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}

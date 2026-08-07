@@ -32,6 +32,10 @@ router.get('/users', adminController.getAllUsers);
 router.patch('/users/:id/role', adminController.updateUserRole);
 router.delete('/users/:id', adminController.deleteUser);
 
+// Comment Moderation
+router.get('/comments', adminController.getAllComments);
+router.delete('/comments/:id', adminController.deleteComment);
+
 // Series Management (direct creation with seasons/episodes)
 router.post('/series', adminController.createSeries);
 

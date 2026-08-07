@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Check, Trash2, Loader2, Calendar, User, Music } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { userApi } from '../services/api';
+import { notificationApi } from '../services/api';
 import { useI18n } from '../i18n/LanguageProvider';
+import { SEOPage } from '../components/SEO';
 import toast from 'react-hot-toast';
 
 interface Notification {
@@ -19,6 +20,11 @@ interface Notification {
   createdAt: string;
 }
 
+interface NotificationsResult {
+  items: Notification[];
+  unread: number;
+}
+
 export function NotificationsPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -27,12 +33,17 @@ export function NotificationsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications'],
-    queryFn: () => userApi.getNotifications().then((r) => r.data.data as Notification[]),
+    queryFn: async () => {
+      const res = await notificationApi.getList(50);
+      return res.data.data as NotificationsResult;
+    },
     staleTime: 60_000,
   });
 
+  const notifications = data?.items ?? [];
+
   const markReadMutation = useMutation({
-    mutationFn: (notificationId: string) => userApi.markNotificationAsRead(notificationId),
+    mutationFn: (notificationId: string) => notificationApi.markRead(notificationId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications'] });
     },
@@ -42,7 +53,7 @@ export function NotificationsPage() {
   });
 
   const clearReadMutation = useMutation({
-    mutationFn: () => userApi.deleteAllReadNotifications(),
+    mutationFn: () => notificationApi.deleteAllRead(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications'] });
       toast.success(t('notifications.cleared'));
@@ -52,11 +63,11 @@ export function NotificationsPage() {
     },
   });
 
-  const filteredNotifications = (data || []).filter((n) => 
+  const filteredNotifications = notifications.filter((n) => 
     filter === 'all' || !n.read
   );
 
-  const unreadCount = data?.filter((n) => !n.read).length || 0;
+  const unreadCount = notifications.filter((n) => !n.read).length || 0;
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
@@ -89,7 +100,14 @@ export function NotificationsPage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <>
+      <SEOPage
+        title="Notifications — Watchin"
+        description="View your notifications for new episodes, recommendations, and activity."
+        canonical="/notifications"
+        noindex={true}
+      />
+      <div className="min-h-screen">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 pt-24 pb-16">
         {/* Header */}
         <div className="mb-8 flex items-end justify-between">
@@ -109,7 +127,7 @@ export function NotificationsPage() {
             </div>
           </div>
 
-          {data && data.length > 0 && (
+          {notifications.length > 0 && (
             <button
               onClick={() => {
                 if (window.confirm(t('notifications.clearAllConfirm'))) {
@@ -222,5 +240,6 @@ export function NotificationsPage() {
         )}
       </div>
     </div>
+  </>
   );
 }

@@ -9,6 +9,7 @@ import { Search as SearchIcon, X, ChevronLeft, ChevronRight, Mic, SlidersHorizon
 import { SearchFilters, SearchResult, Media, Genre, Country, Language } from '../types';
 import { FilterPopover } from '../components/search/FilterPopover';
 import { useI18n } from '../i18n/LanguageProvider';
+import { SEOPage } from '../components/SEO';
 import {
   paramsToFilters,
   filtersToApiParams,
@@ -231,7 +232,14 @@ export function Search() {
   const hasAnyActive = activeChips.length > 0 || !!debouncedQuery;
 
   return (
-    <div className="min-h-screen">
+    <>
+      <SEOPage
+        title="Search Movies, TV Shows & Anime — Watchin"
+        description="Search for movies, TV shows, and anime. Filter by genre, year, rating, quality, and more."
+        canonical="/search"
+        noindex={true}
+      />
+      <div className="min-h-screen">
       <div className="mx-auto max-w-7xl px-6 pb-16 pt-28 sm:px-10 lg:px-14">
         {/* Search bar */}
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
@@ -383,5 +391,6 @@ export function Search() {
         </div>
       </div>
     </div>
+  </>
   );
 }

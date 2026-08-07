@@ -7,6 +7,7 @@ import { Heart, Plus, X, Loader2, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Media, WatchlistItem } from '../types';
 import { useI18n } from '../i18n/LanguageProvider';
+import { SEOPage } from '../components/SEO';
 import { useAddToWatchlist, useRemoveFromWatchlist } from '../hooks/useMedia';
 import toast from 'react-hot-toast';
 
@@ -72,7 +73,14 @@ export function Watchlist() {
   const items = (data?.data || []) as WatchlistItem[];
 
   return (
-    <div className="min-h-screen">
+    <>
+      <SEOPage
+        title="My Watchlist — Watchin"
+        description="Your personal watchlist of movies, TV shows, and anime. Track what you want to watch next."
+        canonical="/watchlist"
+        noindex={true}
+      />
+      <div className="min-h-screen">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-24 pb-16">
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -162,5 +170,6 @@ export function Watchlist() {
         )}
       </div>
     </div>
+  </>
   );
 }

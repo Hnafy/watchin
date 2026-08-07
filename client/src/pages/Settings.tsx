@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { userApi } from '../services/api';
 import { useSettings } from '../hooks/useSettings';
 import {
-  User, Lock, Bell, Eye, MonitorPlay, Palette, AlertTriangle,
+  User, Lock, Bell, Eye, AlertTriangle,
   Save, Loader2, Trash2, ShieldAlert,
 } from 'lucide-react';
 import { AvatarUploader } from '../components/ui/AvatarUploader';
@@ -13,14 +13,12 @@ import { SettingsRow } from '../components/ui/SettingsRow';
 import { Toggle } from '../components/ui/Toggle';
 import toast from 'react-hot-toast';
 
-type Tab = 'account' | 'privacy' | 'notifications' | 'playback' | 'appearance' | 'danger';
+type Tab = 'account' | 'privacy' | 'notifications' | 'danger';
 
 const tabs: { id: Tab; icon: typeof User; label: string }[] = [
   { id: 'account', icon: User, label: 'Account' },
   { id: 'privacy', icon: Eye, label: 'Privacy' },
   { id: 'notifications', icon: Bell, label: 'Notifications' },
-  { id: 'playback', icon: MonitorPlay, label: 'Playback' },
-  { id: 'appearance', icon: Palette, label: 'Appearance' },
   { id: 'danger', icon: AlertTriangle, label: 'Danger Zone' },
 ];
 
@@ -229,52 +227,6 @@ export function Settings() {
                       description="When someone comments or replies to you"
                       control={<Toggle checked={settings.notifications.comments} onChange={(v) => update({ notifications: { ...settings.notifications, comments: v } })} label="Comments & replies" />}
                     />
-                  </SettingCard>
-                )}
-
-                {/* -------------------- PLAYBACK -------------------- */}
-                {activeTab === 'playback' && (
-                  <SettingCard icon={MonitorPlay} title="Playback" description="Customize how videos play">
-                    <SettingsRow
-                      title="Autoplay"
-                      description="Start playing videos automatically when you open the player"
-                      control={<Toggle checked={settings.playback.autoplay} onChange={(v) => update({ playback: { ...settings.playback, autoplay: v } })} label="Autoplay" />}
-                    />
-                    <SettingsRow
-                      title="Resume playback"
-                      description="Pick up where you left off instead of restarting"
-                      control={<Toggle checked={settings.playback.resume} onChange={(v) => update({ playback: { ...settings.playback, resume: v } })} label="Resume playback" />}
-                    />
-                    <SettingsRow
-                      title="Default quality"
-                      description="Preferred stream quality when available"
-                      control={
-                        <select
-                          value={settings.playback.defaultQuality}
-                          onChange={(e) => update({ playback: { ...settings.playback, defaultQuality: e.target.value as any } })}
-                          className="input w-auto min-w-32 px-3 py-2 text-sm"
-                        >
-                          <option value="auto">Auto</option>
-                          <option value="1080p">1080p</option>
-                          <option value="720p">720p</option>
-                          <option value="480p">480p</option>
-                        </select>
-                      }
-                    />
-                  </SettingCard>
-                )}
-
-                {/* -------------------- APPEARANCE -------------------- */}
-                {activeTab === 'appearance' && (
-                  <SettingCard icon={Palette} title="Appearance" description="Tune how Watchin looks and feels">
-                    <SettingsRow
-                      title="Reduce motion"
-                      description="Minimize animations and transitions across the app"
-                      control={<Toggle checked={settings.appearance.reduceMotion} onChange={(v) => update({ appearance: { reduceMotion: v } })} label="Reduce motion" />}
-                    />
-                    <div className="px-5 py-4 text-xs text-dark-500">
-                      Theme is locked to the dark cinema look for now — more themes coming soon.
-                    </div>
                   </SettingCard>
                 )}
 

@@ -118,6 +118,21 @@ FollowSchema.index({ followerId: 1, followedId: 1 }, { unique: true });
 export const Follow = model('Follow', FollowSchema);
 
 // ---------------------------------------------------------------------------
+// Profile Like
+// ---------------------------------------------------------------------------
+const ProfileLikeSchema = new Schema(
+  {
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    likerId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { ...baseOptions, timestamps: true, collection: 'profilelikes' }
+);
+
+ProfileLikeSchema.index({ userId: 1, likerId: 1 }, { unique: true });
+export const ProfileLike = model('ProfileLike', ProfileLikeSchema);
+
+// ---------------------------------------------------------------------------
 // Playlist
 // ---------------------------------------------------------------------------
 const PlaylistSchema = new Schema(
@@ -134,13 +149,19 @@ const PlaylistSchema = new Schema(
     },
     items: [
       {
-        mediaId: { type: String, required: true },
+        mediaId: { type: Schema.Types.ObjectId, ref: 'Media', required: true },
         addedAt: { type: Date, default: Date.now },
         progress: { type: Number, default: 0 },
         rating: { type: Number, min: 1, max: 10, default: null },
         notes: { type: String, default: null, trim: true },
       },
     ],
+    likes: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    likeCount: { type: Number, default: 0 },
+    saves: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    saveCount: { type: Number, default: 0 },
+    forkedFrom: { type: Schema.Types.ObjectId, ref: 'Playlist', default: null },
+    forkCount: { type: Number, default: 0 },
     createdAt: { type: Date, default: Date.now, index: true },
     updatedAt: { type: Date, default: Date.now, index: true },
   },
@@ -148,6 +169,15 @@ const PlaylistSchema = new Schema(
 );
 
 PlaylistSchema.index({ userId: 1, createdAt: -1 });
+PlaylistSchema.index({ visibility: 1, likeCount: -1, createdAt: -1 });
+PlaylistSchema.index({ visibility: 1, saveCount: -1, createdAt: -1 });
+PlaylistSchema.virtual('user', {
+  ref: 'User',
+  localField: 'userId',
+  foreignField: '_id',
+  justOne: true,
+  select: 'username avatar role',
+});
 export const Playlist = model('Playlist', PlaylistSchema);
 
 // ---------------------------------------------------------------------------

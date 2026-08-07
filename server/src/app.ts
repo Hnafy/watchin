@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import { config } from './config/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorMiddleware.js';
 import { requestLogger } from './middleware/requestLogger.js';
@@ -19,6 +20,7 @@ import recommendationRoutes from './routes/recommendationRoutes.js';
 import adsRoutes from './routes/adsRoutes.js';
 import mixdropRoutes from './routes/mixdropRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
+import playlistRoutes from './routes/playlistRoutes.js';
 
 const app = express();
 
@@ -35,6 +37,33 @@ app.use(
     credentials: config.cors.credentials,
   })
 );
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      connectSrc: ["'self'", 'https:', 'wss:'],
+      frameSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: { policy: 'same-origin' },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  dnsPrefetchControl: { allow: true },
+  frameguard: { action: 'deny' },
+  hidePoweredBy: true,
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  ieNoOpen: true,
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  xssFilter: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -74,6 +103,7 @@ app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/ads', adsRoutes);
 app.use('/api/mixdrop', mixdropRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/playlists', playlistRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

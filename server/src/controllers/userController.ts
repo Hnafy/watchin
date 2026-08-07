@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
-import { User, RefreshToken, WatchHistory, WatchlistItem, Rating } from '../db/models.js';
+import { User, RefreshToken, WatchHistory, WatchlistItem, Rating, FriendRequest, Follow, ProfileLike, Playlist, Notification } from '../db/models.js';
+import { escapeRegex } from '../db/utils.js';
 import { AppError } from '../utils/AppError.js';
 import { config } from '../config/index.js';
 
@@ -17,22 +18,39 @@ function flattenSettings(obj: Record<string, any>, prefix = ''): Record<string, 
   return out;
 }
 
+async function createNotification(
+  recipientId: string,
+  senderId: string,
+  type: string,
+  title: string,
+  link?: string
+) {
+  const sender = await User.findById(senderId).select('username');
+  await Notification.create({
+    userId: recipientId,
+    type,
+    title,
+    body: sender ? `${sender.username} ${type.toLowerCase().replace('_', ' ')}` : title,
+    link,
+    relatedUserId: senderId,
+  });
+}
+
+async function getFriendCount(userId: any): Promise<number> {
+  const [following, followers] = await Promise.all([
+    Follow.find({ followerId: userId }).select('followedId'),
+    Follow.find({ followedId: userId }).select('followerId'),
+  ]);
+  const followerIds = new Set(followers.map((f) => String(f.followerId)));
+  return following.filter((f) => followerIds.has(String(f.followedId))).length;
+}
+
+async function getUsername(id: string): Promise<string> {
+  const u = await User.findById(id).select('username');
+  return u?.username ?? 'Someone';
+}
+
 export const userController = {
-  async deleteAllReadNotifications(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-
-      await Notification.deleteMany({ userId, read: true });
-
-      res.json({
-        status: 'success',
-        message: 'Read notifications cleared',
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-
   async getSettings(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
@@ -69,9 +87,139 @@ export const userController = {
         Rating.deleteMany({ userId }),
         FriendRequest.deleteMany({ $or: [{ fromUserId: userId }, { toUserId: userId }] }),
         Follow.deleteMany({ $or: [{ followerId: userId }, { followedId: userId }] }),
-        Playlist.deleteMany({ userId }),
+        ProfileLike.deleteMany({ $or: [{ userId: userId }, { likerId: userId }] }),
+        Notification.deleteMany({ $or: [{ userId: userId }, { relatedUserId: userId }] }),
       ]);
       res.json({ status: 'success', message: 'Account deleted' });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Public profile (optionally authenticated) with counts + public playlists
+  async getProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { username } = req.params;
+      const viewerId = (req as any).user?.id || null;
+
+      const user = await User.findOne({ username }).select('id username avatar role emailVerified createdAt');
+      if (!user) throw AppError.notFound('User not found');
+      const userId = (user as any)._id;
+
+      const [followerCount, followingCount, likeCount, publicPlaylists, isFollowing, isBackFollowing, hasLiked, sentRequest, receivedRequest] = await Promise.all([
+        Follow.countDocuments({ followedId: userId }),
+        Follow.countDocuments({ followerId: userId }),
+        ProfileLike.countDocuments({ userId }),
+        Playlist.find({ userId, visibility: 'PUBLIC' })
+          .sort({ createdAt: -1 })
+          .limit(12)
+          .select('title description coverImage visibility likeCount saveCount items createdAt updatedAt')
+          .populate({ path: 'items.mediaId', select: 'title slug posterUrl' }),
+        viewerId ? Follow.exists({ followerId: viewerId, followedId: userId }) : Promise.resolve(null),
+        viewerId ? Follow.exists({ followerId: userId, followedId: viewerId }) : Promise.resolve(null),
+        viewerId ? ProfileLike.exists({ userId, likerId: viewerId }) : Promise.resolve(null),
+        viewerId
+          ? FriendRequest.findOne({ fromUserId: viewerId, toUserId: userId, status: 'PENDING' })
+          : Promise.resolve(null),
+        viewerId
+          ? FriendRequest.findOne({ fromUserId: userId, toUserId: viewerId, status: 'PENDING' })
+          : Promise.resolve(null),
+      ]);
+
+      const friendCount = await getFriendCount(userId);
+
+      res.json({
+        status: 'success',
+        data: {
+          id: user.id,
+          username: user.username,
+          avatar: user.avatar,
+          role: user.role,
+          emailVerified: user.emailVerified,
+          createdAt: user.createdAt,
+          stats: {
+            followers: followerCount,
+            following: followingCount,
+            friends: friendCount,
+            likes: likeCount,
+          },
+          publicPlaylists,
+          relationship: {
+            isFollowing: !!isFollowing,
+            isFriend: !!(isFollowing && isBackFollowing),
+            hasLiked: !!hasLiked,
+            requestStatus: sentRequest ? 'sent' : receivedRequest ? 'received' : null,
+            requestId: sentRequest ? sentRequest.id : receivedRequest ? receivedRequest.id : null,
+          },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Search users (optionally authenticated) with follow/friend relation
+  async searchUsers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const viewerId = (req as any).user?.id || null;
+      const q = (typeof req.query.q === 'string' ? req.query.q : '').trim();
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const limit = Math.min(50, Number(req.query.limit) || 20);
+
+      const where: any = {};
+      if (q) {
+        where.$or = [
+          { username: { $regex: escapeRegex(q), $options: 'i' } },
+        ];
+      }
+
+      const [users, total] = await Promise.all([
+        User.find(where)
+          .select('id username avatar role createdAt')
+          .sort({ createdAt: -1 })
+          .skip((page - 1) * limit)
+          .limit(limit),
+        User.countDocuments(where),
+      ]);
+
+      const userIds = users.map((u: any) => u._id);
+      const [followedByMe, sentTo, receivedFrom, countRows] = userIds.length
+        ? await Promise.all([
+            viewerId ? Follow.find({ followerId: viewerId, followedId: { $in: userIds } }).select('followedId') : Promise.resolve([]),
+            viewerId ? FriendRequest.find({ fromUserId: viewerId, toUserId: { $in: userIds }, status: 'PENDING' }).select('toUserId') : Promise.resolve([]),
+            viewerId ? FriendRequest.find({ fromUserId: { $in: userIds }, toUserId: viewerId, status: 'PENDING' }).select('fromUserId') : Promise.resolve([]),
+            Follow.aggregate([
+              { $match: { followedId: { $in: userIds } } },
+              { $group: { _id: '$followedId', count: { $sum: 1 } } },
+            ]),
+          ])
+        : [[], [], [], []];
+
+      const followingSet = new Set(followedByMe.map((f: any) => String(f.followedId)));
+      const sentSet = new Set(sentTo.map((f: any) => String(f.toUserId)));
+      const receivedSet = new Set(receivedFrom.map((f: any) => String(f.fromUserId)));
+      const followerCounts = new Map(countRows.map((r: any) => [String(r._id), r.count]));
+
+      const data = users.map((u: any) => ({
+        id: u.id,
+        username: u.username,
+        avatar: u.avatar,
+        role: u.role,
+        createdAt: u.createdAt,
+        followerCount: followerCounts.get(String(u._id)) || 0,
+        isFollowing: followingSet.has(String(u._id)),
+        friendStatus: sentSet.has(String(u._id))
+          ? 'sent'
+          : receivedSet.has(String(u._id))
+            ? 'received'
+            : null,
+      }));
+
+      res.json({
+        status: 'success',
+        data,
+        pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      });
     } catch (error) {
       next(error);
     }
@@ -84,6 +232,7 @@ export const userController = {
       const { toUserId } = req.body;
 
       if (fromUserId === toUserId) throw AppError.badRequest('Cannot send friend request to yourself');
+      if (!(await User.exists({ _id: toUserId }))) throw AppError.notFound('User not found');
 
       const existing = await FriendRequest.findOne({ fromUserId, toUserId });
       if (existing) {
@@ -97,17 +246,30 @@ export const userController = {
           { fromUserId: toUserId, toUserId: fromUserId },
           { $set: { status: 'ACCEPTED' } }
         );
-        await Follow.create([{ followerId: fromUserId, followedId: toUserId }, { followerId: toUserId, followedId: fromUserId }]);
         await Promise.all([
-          createNotification(fromUserId, toUserId, 'FRIEND_REQUEST', 'You are now friends!', `/profile/${toUserId}`),
-          createNotification(toUserId, fromUserId, 'FRIEND_REQUEST', 'Accepted your friend request!', `/profile/${fromUserId}`),
+          Follow.updateOne(
+            { followerId: fromUserId, followedId: toUserId },
+            { $setOnInsert: { followerId: fromUserId, followedId: toUserId } },
+            { upsert: true }
+          ),
+          Follow.updateOne(
+            { followerId: toUserId, followedId: fromUserId },
+            { $setOnInsert: { followerId: toUserId, followedId: fromUserId } },
+            { upsert: true }
+          ),
         ]);
-        res.json({ status: 'success', message: 'Friend request accepted' });
+        const myName = await getUsername(fromUserId);
+        await Promise.all([
+          createNotification(fromUserId, toUserId, 'FRIEND_REQUEST', `You are now friends with ${myName}`, `/user/${fromUserId}`),
+          createNotification(toUserId, fromUserId, 'FRIEND_REQUEST', `${myName} accepted your friend request!`, `/user/${fromUserId}`),
+        ]);
+        res.json({ status: 'success', message: 'Friend request accepted', data: { accepted: true } });
         return;
       }
 
       await FriendRequest.create({ fromUserId, toUserId, status: 'PENDING' });
-      await createNotification(toUserId, fromUserId, 'FRIEND_REQUEST', `${(await User.findById(fromUserId)).username} sent you a friend request`, `/profile/${fromUserId}`);
+      const myName = await getUsername(fromUserId);
+      await createNotification(toUserId, fromUserId, 'FRIEND_REQUEST', `${myName} sent you a friend request`, `/user/${fromUserId}`);
 
       res.json({ status: 'success', message: 'Friend request sent' });
     } catch (error) {
@@ -118,22 +280,42 @@ export const userController = {
   async respondFriendRequest(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
-      const { requestId, action } = req.body;
+      const { requestId } = req.params;
+      const { action } = req.body;
 
       const request = await FriendRequest.findById(requestId);
       if (!request) throw AppError.notFound('Friend request not found');
-      if (request.toUserId.toString() !== userId) throw AppError.forbidden('Not authorized to respond');
+      if (String(request.toUserId) !== userId) throw AppError.forbidden('Not authorized to respond');
+      if (request.status !== 'PENDING') throw AppError.badRequest('This request has already been handled');
+
+      const otherId = String(request.fromUserId);
+      const other = await User.findById(otherId).select('username');
 
       if (action === 'accept') {
         request.status = 'ACCEPTED';
         await request.save();
-        await Follow.create([{ followerId: request.fromUserId, followedId: request.toUserId }, { followerId: request.toUserId, followedId: request.fromUserId }]);
-        await createNotification(request.fromUserId, request.toUserId, 'FRIEND_REQUEST', 'Accepted your friend request!', `/profile/${request.fromUserId}`);
+        await Promise.all([
+          Follow.updateOne(
+            { followerId: otherId, followedId: userId },
+            { $setOnInsert: { followerId: otherId, followedId: userId } },
+            { upsert: true }
+          ),
+          Follow.updateOne(
+            { followerId: userId, followedId: otherId },
+            { $setOnInsert: { followerId: userId, followedId: otherId } },
+            { upsert: true }
+          ),
+        ]);
+        const myName = await getUsername(userId);
+        await createNotification(otherId, userId, 'FRIEND_REQUEST', `${myName} accepted your friend request!`, `/user/${userId}`);
         res.json({ status: 'success', message: 'Friend request accepted' });
       } else {
         request.status = 'DECLINED';
         await request.save();
-        await createNotification(request.fromUserId, request.toUserId, 'FRIEND_REQUEST', 'Declined your friend request', `/profile/${request.fromUserId}`);
+        if (other) {
+          const myName = await getUsername(userId);
+          await createNotification(otherId, userId, 'FRIEND_REQUEST', `${myName} declined your friend request`, `/user/${userId}`);
+        }
         res.json({ status: 'success', message: 'Friend request declined' });
       }
     } catch (error) {
@@ -144,11 +326,11 @@ export const userController = {
   async cancelFriendRequest(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
-      const { requestId } = req.body;
+      const { requestId } = req.params;
 
       const request = await FriendRequest.findById(requestId);
       if (!request) throw AppError.notFound('Friend request not found');
-      if (request.fromUserId.toString() !== userId) throw AppError.forbidden('Not authorized to cancel');
+      if (String(request.fromUserId) !== userId) throw AppError.forbidden('Not authorized to cancel');
 
       await FriendRequest.deleteOne({ _id: requestId });
       res.json({ status: 'success', message: 'Friend request cancelled' });
@@ -162,32 +344,45 @@ export const userController = {
       const userId = (req as any).user.id;
       const { friendId } = req.body;
 
-      await Follow.deleteMany({ $or: [{ followerId: userId, followedId: friendId }, { followerId: friendId, followedId: userId }] });
+      await Follow.deleteMany({
+        $or: [
+          { followerId: userId, followedId: friendId },
+          { followerId: friendId, followedId: userId },
+        ],
+      });
       res.json({ status: 'success', message: 'Friend removed' });
     } catch (error) {
       next(error);
     }
   },
 
-  // Follow/Unfollow
+  // Follow / Unfollow
   async toggleFollow(req: Request, res: Response, next: NextFunction) {
     try {
       const followerId = (req as any).user.id;
       const { followingId } = req.body;
 
       if (followerId === followingId) throw AppError.badRequest('Cannot follow yourself');
+      if (!(await User.exists({ _id: followingId }))) throw AppError.notFound('User not found');
 
       const existing = await Follow.findOne({ followerId, followedId: followingId });
       if (existing) {
         await Follow.deleteOne({ _id: existing._id });
-        await createNotification(followingId, followerId, 'FOLLOW', `${(await User.findById(followerId)).username} unfollowed you`, `/profile/${followerId}`);
-        res.json({ status: 'success', message: 'Unfollowed' });
+        res.json({ status: 'success', message: 'Unfollowed', data: { following: false } });
         return;
       }
 
       await Follow.create({ followerId, followedId: followingId });
-      await createNotification(followingId, followerId, 'FOLLOW', `${(await User.findById(followerId)).username} started following you`, `/profile/${followerId}`);
-      res.json({ status: 'success', message: 'Following' });
+      const myName = await getUsername(followerId);
+      await Notification.create({
+        userId: followingId,
+        type: 'FOLLOW',
+        title: `${myName} started following you`,
+        body: `${myName} started following you`,
+        link: `/user/${followerId}`,
+        relatedUserId: followerId,
+      });
+      res.json({ status: 'success', message: 'Following', data: { following: true } });
     } catch (error) {
       next(error);
     }
@@ -196,244 +391,79 @@ export const userController = {
   async getFollowStats(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
-
       const [followers, followings] = await Promise.all([
         Follow.countDocuments({ followedId: userId }),
         Follow.countDocuments({ followerId: userId }),
       ]);
-
-      res.json({
-        status: 'success',
-        data: { followers, followings },
-      });
+      res.json({ status: 'success', data: { followers, followings } });
     } catch (error) {
       next(error);
     }
   },
 
-  async getProfile(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { username } = req.params;
-
-      const user = await User.findOne({ username }).select('id username avatar role emailVerified createdAt');
-      if (!user) throw AppError.notFound('User not found');
-
-      res.json({
-        status: 'success',
-        data: user,
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-
+  // List friends / followers / following of a user by username
   async getUserFriends(req: Request, res: Response, next: NextFunction) {
     try {
       const { username } = req.params;
-      const mode = req.query.mode as string || 'friends';
+      const mode = (req.query.mode as string) || 'friends';
 
-      const targetUser = await User.findOne({ username }).select('_id');
-      if (!targetUser) throw AppError.notFound('User not found');
+      const user = await User.findOne({ username });
+      if (!user) throw AppError.notFound('User not found');
+      const userId = (user as any)._id;
 
-      let friends: any[] = [];
-
-      if (mode === 'friends') {
-        const followPairs = await Follow.find({
-          $or: [
-            { followerId: targetUser._id, followedId: { $ne: targetUser._id } },
-            { followedId: targetUser._id, followerId: { $ne: targetUser._id } },
-          ],
-        }).populate('followerId', 'username avatar role createdAt').populate('followedId', 'username avatar role createdAt');
-
-        const userMap = new Map();
-        followPairs.forEach((pair) => {
-          const friend = pair.followerId._id.toString() === targetUser._id.toString()
-            ? pair.followedId
-            : pair.followerId;
-          if (!userMap.has(friend._id.toString())) {
-            userMap.set(friend._id.toString(), friend);
-          }
-        });
-
-        friends = Array.from(userMap.values());
-      } else if (mode === 'following') {
-        const following = await Follow.find({ followerId: targetUser._id }).populate('followedId', 'username avatar role createdAt');
-        friends = following.map((pair) => pair.followedId);
+      let ids: any[] = [];
+      if (mode === 'following') {
+        const rows = await Follow.find({ followerId: userId }).select('followedId');
+        ids = rows.map((r) => r.followedId);
       } else if (mode === 'followers') {
-        const followers = await Follow.find({ followedId: targetUser._id }).populate('followerId', 'username avatar role createdAt');
-        friends = followers.map((pair) => pair.followerId);
+        const rows = await Follow.find({ followedId: userId }).select('followerId');
+        ids = rows.map((r) => r.followerId);
+      } else {
+        const [followingRows, followerRows] = await Promise.all([
+          Follow.find({ followerId: userId }).select('followedId'),
+          Follow.find({ followedId: userId }).select('followerId'),
+        ]);
+        const followerIds = new Set(followerRows.map((r) => String(r.followerId)));
+        ids = followingRows.filter((r) => followerIds.has(String(r.followedId))).map((r) => r.followedId);
       }
 
-      res.json({
-        status: 'success',
-        data: friends,
-      });
+      const users = await User.find({ _id: { $in: ids } })
+        .select('id username avatar role createdAt')
+        .sort({ username: 1 });
+
+      res.json({ status: 'success', data: users });
     } catch (error) {
       next(error);
     }
   },
 
-  async deleteAllReadNotifications(req: Request, res: Response, next: NextFunction) {
+  // Like / unlike a user's profile
+  async toggleProfileLike(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user.id;
+      const likerId = (req as any).user.id;
+      const { userId } = req.body;
 
-      await Notification.deleteMany({ userId, read: true });
+      if (likerId === userId) throw AppError.badRequest('Cannot like your own profile');
+      if (!(await User.exists({ _id: userId }))) throw AppError.notFound('User not found');
 
-      res.json({
-        status: 'success',
-        message: 'Read notifications cleared',
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
+      const existing = await ProfileLike.findOne({ userId, likerId });
+      if (existing) {
+        await ProfileLike.deleteOne({ _id: existing._id });
+        res.json({ status: 'success', data: { liked: false } });
+        return;
+      }
 
-  // Playlists
-  async createPlaylist(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-      const { title, description, visibility = 'PUBLIC', items = [] } = req.body;
-
-      const playlist = await Playlist.create({
-        title,
-        description,
+      await ProfileLike.create({ userId, likerId });
+      const myName = await getUsername(likerId);
+      await Notification.create({
         userId,
-        visibility,
-        items,
+        type: 'LIKE',
+        title: `${myName} liked your profile`,
+        body: `${myName} liked your profile`,
+        link: `/user/${likerId}`,
+        relatedUserId: likerId,
       });
-
-      res.json({ status: 'success', data: playlist });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async getPlaylist(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-      const { playlistId } = req.params;
-
-      const playlist = await Playlist.findOne({ _id: playlistId, $or: [{ userId }, { visibility: 'PUBLIC' }] });
-      if (!playlist) throw AppError.notFound('Playlist not found');
-
-      res.json({ status: 'success', data: playlist });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async updatePlaylist(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-      const { playlistId } = req.params;
-      const { title, description, visibility, items } = req.body;
-
-      const playlist = await Playlist.findOneAndUpdate(
-        { _id: playlistId, userId },
-        { $set: { ...(title && { title }), ...(description !== undefined && { description }), ...(visibility && { visibility }), ...(items && { items }), updatedAt: new Date() } },
-        { new: true }
-      );
-
-      if (!playlist) throw AppError.notFound('Playlist not found');
-
-      res.json({ status: 'success', data: playlist });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async deletePlaylist(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-      const { playlistId } = req.params;
-
-      const playlist = await Playlist.findOneAndDelete({ _id: playlistId, userId });
-      if (!playlist) throw AppError.notFound('Playlist not found');
-
-      res.json({ status: 'success', message: 'Playlist deleted' });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async addItemToPlaylist(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-      const { playlistId } = req.params;
-      const { mediaId, progress = 0, rating = null, notes = null } = req.body;
-
-      const playlist = await Playlist.findOneAndUpdate(
-        { _id: playlistId, userId },
-        { $push: { items: { mediaId, addedAt: new Date(), progress, rating, notes } }, updatedAt: new Date() },
-        { new: true }
-      );
-
-      if (!playlist) throw AppError.notFound('Playlist not found');
-
-      res.json({ status: 'success', data: playlist });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async removeItemFromPlaylist(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-      const { playlistId, mediaId } = req.params;
-
-      const playlist = await Playlist.findOneAndUpdate(
-        { _id: playlistId, userId },
-        { $pull: { items: { mediaId } }, updatedAt: new Date() },
-        { new: true }
-      );
-
-      if (!playlist) throw AppError.notFound('Playlist not found');
-
-      res.json({ status: 'success', data: playlist });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async getUserPlaylists(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-
-      const playlists = await Playlist.find({ userId }).sort({ createdAt: -1 });
-
-      res.json({ status: 'success', data: playlists });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  // Notifications
-  async getNotifications(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-
-      const notifications = await Notification.find({ userId }).sort({ createdAt: -1 });
-
-      res.json({ status: 'success', data: notifications });
-    } catch (error) {
-      next(error);
-    }
-  },
-
-  async markNotificationAsRead(req: Request, res: Response, next: NextFunction) {
-    try {
-      const userId = (req as any).user.id;
-      const { notificationId } = req.params;
-
-      const notification = await Notification.findOneAndUpdate(
-        { _id: notificationId, userId },
-        { $set: { read: true } },
-        { new: true }
-      );
-
-      if (!notification) throw AppError.notFound('Notification not found');
-
-      res.json({ status: 'success', data: notification });
+      res.json({ status: 'success', data: { liked: true } });
     } catch (error) {
       next(error);
     }
@@ -482,7 +512,6 @@ export const userController = {
     }
   },
 
-  // Existing methods...
   async updateProfile(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user.id;
@@ -575,22 +604,3 @@ export const userController = {
     }
   },
 };
-
-async function createNotification(
-  recipientId: string,
-  senderId: string,
-  type: string,
-  title: string,
-  link?: string
-) {
-  await Notification.create({
-    userId: recipientId,
-    type,
-    title,
-    body: `${(await User.findById(senderId)).username} ${type.toLowerCase().replace('_', ' ')}`,
-    link,
-    relatedUserId: senderId,
-    createdAt: new Date(),
-  });
-}
-

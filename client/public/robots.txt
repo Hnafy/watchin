@@ -1,0 +1,25 @@
+# Watchin - robots.txt
+User-agent: *
+Allow: /
+
+# Disallow private/admin areas
+Disallow: /login
+Disallow: /register
+Disallow: /watchlist
+Disallow: /profile
+Disallow: /notifications
+Disallow: /history
+Disallow: /settings
+Disallow: /admin
+Disallow: /api/
+Disallow: /watch/
+Disallow: /play/
+
+# Sitemap
+Sitemap: https://watchin.app/sitemap.xml
+
+# Host
+Host: https://watchin.app
+
+# Crawl-delay
+Crawl-delay: 10

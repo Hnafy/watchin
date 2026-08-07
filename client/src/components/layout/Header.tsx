@@ -1,19 +1,19 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Search, User, LogOut, Heart, LayoutDashboard, Settings, SlidersHorizontal, Film, Tv, Zap, Sparkles, Bell, ListMusic } from 'lucide-react';
+import { Menu, X, Search, User, LogOut, Heart, LayoutDashboard, Settings, SlidersHorizontal, Film, Tv, Zap, Sparkles, Bell, ListMusic, Users } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { FilterPopover } from '../search/FilterPopover';
 import { SearchFilters } from '../../types';
 import { paramsToFilters, filtersToSearchParams } from '../../utils/filters';
+import { notificationApi } from '../../services/api';
 
 const NAV_LINKS = [
   { to: '/', label: 'Home' },
   { to: '/movies', label: 'Movies' },
   { to: '/tv-shows', label: 'TV Shows' },
-  { to: '/trending', label: 'Trending' },
   { to: '/anime', label: 'Anime' },
-  { to: '/about', label: 'About' },
 ];
 
 const CATEGORIES = [
@@ -25,7 +25,7 @@ const CATEGORIES = [
 
 const MOBILE_NAV_LINKS = [
   { to: '/', label: 'Home' },
-  { to: '/about', label: 'About' },
+  { to: '/users', label: 'People' },
 ];
 
 const USER_MENU_ITEMS = [
@@ -38,7 +38,6 @@ export const Header = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const currentFilters = paramsToFilters(new URLSearchParams(location.search));
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,6 +47,18 @@ export const Header = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isCategoryActive = (cat: { to: string }) => location.pathname === cat.to;
+
+  const { data: unreadData } = useQuery({
+    queryKey: ['notifications', 'count'],
+    queryFn: async () => {
+      const res = await notificationApi.getList(1);
+      return (res.data.data as { unread?: number }).unread ?? 0;
+    },
+    enabled: isAuthenticated,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+  const unreadCount = unreadData ?? 0;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 50);
@@ -63,6 +74,18 @@ export const Header = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const currentFilters = paramsToFilters(new URLSearchParams(location.search));
+  const activeFilterCount =
+    (currentFilters.type?.length || 0) +
+    (currentFilters.genre?.length || 0) +
+    (currentFilters.country?.length || 0) +
+    (currentFilters.language?.length || 0) +
+    (currentFilters.quality?.length || 0) +
+    (currentFilters.yearFrom ? 1 : 0) +
+    (currentFilters.yearTo ? 1 : 0) +
+    (currentFilters.ratingFrom ? 1 : 0) +
+    (currentFilters.sortBy ? 1 : 0);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim().length >= 2) {
@@ -77,19 +100,8 @@ export const Header = () => {
     const sp = filtersToSearchParams(filters);
     Object.entries(sp).forEach(([k, v]) => params.set(k, v));
     const qs = params.toString();
-    if (location.pathname === '/search') {
-      navigate(`/search${qs ? `?${qs}` : ''}`, { replace: true });
-    } else {
-      navigate(`/search${qs ? `?${qs}` : ''}`);
-    }
-  }, [navigate, location.pathname]);
-
-  const isSearchPage = location.pathname === '/search';
-  const hasFilterSpecific = !!(currentFilters.type?.length || currentFilters.genre?.length ||
-    currentFilters.country?.length || currentFilters.language?.length ||
-    currentFilters.quality?.length || currentFilters.yearFrom ||
-    currentFilters.yearTo || currentFilters.ratingFrom || currentFilters.sortBy);
-  const filtersActive = filtersOpen || (isSearchPage && hasFilterSpecific);
+    navigate(`/search${qs ? `?${qs}` : ''}`);
+  }, [navigate]);
 
   return (
     <motion.header
@@ -130,24 +142,57 @@ export const Header = () => {
 
         {/* Search + Actions */}
         <div className="flex items-center gap-1.5">
-          {/* Filter button + popover wrapper */}
-          <div className="relative">
-            <div className="hidden md:block">
-              <motion.button
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setFiltersOpen(!filtersOpen)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition-all duration-300 ${
-                  filtersActive
-                    ? 'bg-primary-600/15 text-primary-300 border-primary-700/30'
-                    : 'bg-dark-800/80 text-dark-300 border-dark-600 hover:text-white hover:border-dark-500'
-                }`}
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                <span className="hidden xl:inline">Filters</span>
-              </motion.button>
-            </div>
-
+          {/* Desktop Search */}
+          <div className="relative hidden md:block">
+            <form onSubmit={handleSearch} className={`block transition-all duration-300 ease-out ${searchExpanded ? 'w-80' : 'w-56'}`}>
+              <div className="group relative">
+                <div className="absolute -inset-px rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 transition-all duration-300 group-focus-within:from-primary-500/60 group-focus-within:via-primary-400/30 group-focus-within:to-transparent group-focus-within:shadow-[0_0_28px_rgba(124,58,237,0.25)]" />
+                <div className="relative flex items-center rounded-full bg-dark-950/70 backdrop-blur-xl px-3.5 py-2">
+                  <Search className="h-4 w-4 shrink-0 text-white/40 transition-all duration-300 group-focus-within:text-primary-400 group-focus-within:scale-110" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setSearchExpanded(true)}
+                    onBlur={() => setTimeout(() => setSearchExpanded(false), 150)}
+                    placeholder="Search"
+                    className="w-full min-w-0 bg-transparent px-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none"
+                  />
+                  {searchQuery && (
+                    <button type="button" onClick={() => setSearchQuery('')}
+                      className="p-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <span className="mx-1 h-4 w-px bg-white/10" />
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.92 }}
+                    onClick={() => setFiltersOpen((v) => !v)}
+                    className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
+                      activeFilterCount > 0 || filtersOpen
+                        ? 'bg-primary-600/20 text-primary-300'
+                        : 'text-white/40 hover:text-white hover:bg-white/10'
+                    }`}
+                    title="Filters"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    {activeFilterCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary-600 px-0.5 text-[8px] font-bold text-white ring-2 ring-dark-950">
+                        {activeFilterCount > 9 ? '9+' : activeFilterCount}
+                      </span>
+                    )}
+                  </motion.button>
+                </div>
+                <motion.span
+                  initial={false}
+                  animate={{ scaleX: searchExpanded ? 1 : 0 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  className="pointer-events-none absolute inset-x-6 -bottom-px h-px origin-left rounded-full bg-gradient-to-r from-primary-500 via-primary-400 to-transparent"
+                />
+              </div>
+            </form>
             <FilterPopover
               open={filtersOpen}
               onClose={() => setFiltersOpen(false)}
@@ -155,30 +200,6 @@ export const Header = () => {
               filters={currentFilters}
             />
           </div>
-
-          {/* Desktop Search */}
-          <form onSubmit={handleSearch} className="hidden md:block relative">
-            <div className={`flex items-center transition-all duration-300 ${searchExpanded ? 'w-72' : 'w-52'}`}>
-              <div className="relative flex-1 group">
-                <Search className="left-3 absolute top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 group-focus-within:text-primary-400 transition-colors" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setSearchExpanded(true)}
-                  onBlur={() => setTimeout(() => setSearchExpanded(false), 150)}
-                  placeholder="Search for movies, TV shows, actors..."
-                  className="pl-9 pr-8 w-full py-2 rounded-xl bg-dark-800/80 text-white text-sm placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-primary-500/40 focus:bg-dark-800 transition-all border border-white/5 focus:border-primary-500/30"
-                />
-                {searchQuery && (
-                  <button type="button" onClick={() => setSearchQuery('')}
-                    className="right-2 absolute top-1/2 -translate-y-1/2 p-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </form>
 
             {/* Watchlist */}
             <Link to="/watchlist" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block">
@@ -193,9 +214,16 @@ export const Header = () => {
             {/* Notifications */}
             <Link to="/notifications" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block relative">
               <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-xs font-medium flex items-center justify-center">
-                3
-              </span>
+              {isAuthenticated && unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 rounded-full bg-red-500 text-white text-xs font-medium flex items-center justify-center px-1">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Link>
+
+            {/* People */}
+            <Link to="/users" className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/8 transition-colors hidden sm:block relative">
+              <Users className="h-5 w-5" />
             </Link>
 
             {/* User Menu */}
@@ -227,6 +255,7 @@ export const Header = () => {
                       </div>
                       {[
                         { to: '/profile', icon: User, label: 'Profile' },
+                        { to: `/user/${user.username}/friends`, icon: Users, label: 'Friends' },
                         { to: '/watchlist', icon: Heart, label: 'Watchlist' },
                         { to: '/playlists', icon: ListMusic, label: 'Playlists' },
                         { to: '/notifications', icon: Bell, label: 'Notifications' },
@@ -282,25 +311,47 @@ export const Header = () => {
             className="lg:hidden border-t border-white/8 overflow-hidden bg-dark-950/98 backdrop-blur-xl"
           >
             <div className="p-4 space-y-1">
-              <form onSubmit={handleSearch} className="relative mb-4">
-                <Search className="left-3 absolute top-1/2 -translate-y-1/2 h-5 w-5 text-white/30" />
-                <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search for movies, TV shows, actors..."
-                  className="pl-10 pr-4 w-full py-2.5 rounded-xl bg-dark-800/80 text-white text-sm placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-primary-500/40 border border-white/5 focus:border-primary-500/30" />
-              </form>
-               <div className="mb-4">
-                 <button
-                   onClick={() => { setFiltersOpen(true); setMenuOpen(false); }}
-                   className={`flex items-center gap-2 w-full px-4 py-2.5 rounded-lg transition-colors ${
-                     filtersActive
-                       ? 'bg-primary-600/15 text-primary-300'
-                       : 'text-white/60 hover:text-white hover:bg-white/5'
-                   }`}
-                 >
-                   <SlidersHorizontal className="h-4 w-4" />
-                   Filters
-                 </button>
-               </div>
+              <div className="relative mb-4">
+                <form onSubmit={handleSearch}>
+                  <div className="group relative">
+                    <div className="absolute -inset-px rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 transition-colors duration-300 group-focus-within:from-primary-500/60 group-focus-within:via-primary-400/30 group-focus-within:to-transparent group-focus-within:shadow-[0_0_20px_rgba(124,58,237,0.18)]" />
+                    <div className="relative flex items-center rounded-full bg-dark-950/70 backdrop-blur-xl px-3.5 py-2.5">
+                      <Search className="h-4 w-4 shrink-0 text-white/40 transition-colors group-focus-within:text-primary-400" />
+                      <input type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search"
+                        className="w-full min-w-0 bg-transparent px-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none" />
+                      {searchQuery && (
+                        <button type="button" onClick={() => setSearchQuery('')}
+                          className="p-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      <span className="mx-1 h-4 w-px bg-white/10" />
+                      <button
+                        type="button"
+                        onClick={() => setFiltersOpen(true)}
+                        className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-colors ${
+                          activeFilterCount > 0 ? 'bg-primary-600/20 text-primary-300' : 'text-white/40 hover:text-white hover:bg-white/10'
+                        }`}
+                        title="Filters"
+                      >
+                        <SlidersHorizontal className="h-3.5 w-3.5" />
+                        {activeFilterCount > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary-600 px-0.5 text-[8px] font-bold text-white ring-2 ring-dark-950">
+                            {activeFilterCount > 9 ? '9+' : activeFilterCount}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+                <FilterPopover
+                  open={filtersOpen}
+                  onClose={() => setFiltersOpen(false)}
+                  onApply={handleApplyFilters}
+                  filters={currentFilters}
+                />
+              </div>
                <div className="mb-4">
                  <p className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-dark-500">Categories</p>
                  {CATEGORIES.map((cat) => (

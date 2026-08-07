@@ -7,6 +7,8 @@ const router = Router();
 router.use(authenticate);
 router.get('/', notificationController.list);
 router.post('/:id/read', notificationController.markRead);
+router.patch('/:id/read', notificationController.markRead);
 router.post('/read-all', notificationController.markAllRead);
+router.delete('/read-all', notificationController.deleteAllRead);
 
 export default router;

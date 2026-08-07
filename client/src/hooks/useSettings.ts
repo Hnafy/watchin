@@ -14,21 +14,11 @@ export interface UserSettings {
     showWatchHistory: boolean;
     showStats: boolean;
   };
-  playback: {
-    autoplay: boolean;
-    resume: boolean;
-    defaultQuality: 'auto' | '1080p' | '720p' | '480p';
-  };
-  appearance: {
-    reduceMotion: boolean;
-  };
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
   notifications: { emailUpdates: false, newReleases: true, watchlist: true, comments: true },
   privacy: { publicProfile: true, showWatchHistory: true, showStats: true },
-  playback: { autoplay: true, resume: true, defaultQuality: 'auto' },
-  appearance: { reduceMotion: false },
 };
 
 function deepMerge<T>(base: T, patch: Partial<T>): T {
