@@ -29,7 +29,15 @@ app.set('trust proxy', 1);
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || config.cors.origins.includes(origin)) {
+      if (!origin) {
+        return callback(null, true);
+      }
+      const allowedOrigins = config.cors.origins;
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      // Allow Vercel preview deployments (watchin-client-*.vercel.app)
+      if (/^https:\/\/watchin-client-[a-z0-9-]+\.vercel\.app$/.test(origin)) {
         return callback(null, true);
       }
       return callback(null, false);
