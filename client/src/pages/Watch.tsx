@@ -1,9 +1,9 @@
-import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { mediaApi, watchHistoryApi, mixdropApi, adminApi, API_URL } from '../services/api';
 import {
   ArrowLeft, Loader2, UploadCloud, Check, Save, RefreshCw, Clapperboard, HardDrive, X,
-  Star, Clock, CalendarDays, Server as ServerIcon, Lock,
+  Star, Clock, CalendarDays, Server as ServerIcon,
 } from 'lucide-react';
 import { useRef, useEffect, useCallback, useState, useMemo, DragEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -58,14 +58,14 @@ export function Watch() {
     return season?.episodes.find((e: any) => e.episodeNumber === Number(episodeParam));
   })();
 
-  // Real video URLs are only served to authenticated users.
+  // Real video URLs are served to everyone, guests included.
   const episodeId = episode?.id;
 
   const { data: watchSource, isLoading: sourceLoading } = useQuery({
     queryKey: ['watch-source', id, episodeId],
     queryFn: () =>
       mediaApi.getWatchSource(id!, episodeId).then((r) => r.data.data as WatchSource),
-    enabled: !!id && isAuthenticated && !!media,
+    enabled: !!id && !!media,
     staleTime: 300_000,
   });
 
@@ -245,36 +245,8 @@ export function Watch() {
     );
   }
 
-  // Guests can't receive real video URLs — prompt them to log in.
-  if (!isAuthenticated && media.hasWatchSource) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white pt-16 px-4">
-        <div className="text-center max-w-md">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-600/20 ring-1 ring-primary-500/30">
-            <Lock className="h-6 w-6 text-primary-400" />
-          </div>
-          <h1 className="text-xl font-bold">{media.title}</h1>
-          <p className="mt-2 text-sm text-dark-300">
-            This title is available to watch, but you need to be signed in to access the video.
-          </p>
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <Link
-              to={`/login?redirect=/watch/${media.id}${seasonParam ? `?season=${seasonParam}&episode=${episodeParam}` : ''}`}
-              className="rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-primary-500"
-            >
-              Log in to watch
-            </Link>
-            <Link
-              to={`/register?redirect=/watch/${media.id}${seasonParam ? `?season=${seasonParam}&episode=${episodeParam}` : ''}`}
-              className="rounded-lg border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/80 transition-colors hover:bg-white/10"
-            >
-              Create account
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Guests watch without an account; progress saving and watchlist stay
+  // reserved for signed-in users.
 
   if (sourceLoading) {
     return (

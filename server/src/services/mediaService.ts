@@ -778,7 +778,7 @@ export const mediaService = {
 
   /**
    * Returns the real video sources for a media item or a specific episode.
-   * Only reachable by authenticated users — this is where protected links live.
+   * Available to guests so they can watch without an account.
    */
   async getWatchSource(id: string, episodeId?: string) {
     const media = await Media.findById(id);

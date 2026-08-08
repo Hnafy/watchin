@@ -9,12 +9,6 @@ export const registerSchema = z.object({
   password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .max(128, 'Password must be at most 128 characters'),
-  code: z.string()
-    .regex(/^\d{6}$/, 'Verification code must be 6 digits'),
-});
-
-export const sendVerificationSchema = z.object({
-  email: z.string().email('Invalid email address'),
 });
 
 export const googleLoginSchema = z.object({

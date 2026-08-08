@@ -20,36 +20,6 @@ if (smtpConfigured) {
 }
 
 /**
- * Sends an email. When SMTP is not configured (dev mode) the message is
- * logged and the code is returned so the flow can be tested without a real
- * mail server.
- */
-export async function sendVerificationEmail(email: string, code: string): Promise<{ devCode: string | null }> {
-  if (!transporter) {
-    // eslint-disable-next-line no-console
-    console.log(`[email:dev] verification code for ${email}: ${code}`);
-    return { devCode: code };
-  }
-
-  await transporter.sendMail({
-    from: config.email.from || `Watchin <${config.email.user}>`,
-    to: email,
-    subject: 'Your Watchin verification code',
-    text: `Your Watchin verification code is: ${code}\n\nIt expires in 10 minutes. If you didn't request this, you can ignore this email.`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-        <h2 style="color: #e50914; margin: 0 0 16px;">Watchin</h2>
-        <p style="color: #333; font-size: 15px;">Your verification code is:</p>
-        <div style="font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #111; background: #f5f5f5; border-radius: 8px; padding: 16px; text-align: center; margin: 16px 0;">${code}</div>
-        <p style="color: #666; font-size: 13px;">This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
-      </div>
-    `,
-  });
-
-  return { devCode: null };
-}
-
-/**
  * Sends a generic HTML email (admin messages, warnings, account notices).
  * Gracefully no-ops in dev mode when SMTP is not configured.
  */

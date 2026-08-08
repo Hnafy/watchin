@@ -15,42 +15,21 @@ const schema = z.object({
   username: z.string().min(3, 'At least 3 characters'),
   email: z.string().email('Enter a valid email'),
   password: z.string().min(6, 'At least 6 characters'),
-  code: z.string().regex(/^\d{6}$/, 'Code must be 6 digits'),
 });
 type Form = z.infer<typeof schema>;
 
 export function Register() {
   const navigate = useNavigate();
   const { t } = useI18n();
-  const { register: registerUser, isRegistering, sendVerificationCode, isSendingCode } = useAuth();
-  const { register, handleSubmit, getValues, formState: { errors } } = useForm<Form>({ resolver: zodResolver(schema) });
+  const { register: registerUser, isRegistering } = useAuth();
+  const { register, handleSubmit, formState: { errors } } = useForm<Form>({ resolver: zodResolver(schema) });
   const [showPassword, setShowPassword] = useState(false);
-  const [codeSent, setCodeSent] = useState(false);
 
   const onSubmit = async (data: Form) => {
     try {
       await registerUser(data);
       toast.success(t('auth.accountCreatedToast'));
       navigate('/');
-    } catch (e: any) {
-      toast.error(e.response?.data?.message || t('auth.registrationFailed'));
-    }
-  };
-
-  const onSendCode = async () => {
-    const email = getValues('email');
-    if (!email || !z.string().email().safeParse(email).success) {
-      toast.error(t('auth.enterEmail'));
-      return;
-    }
-    try {
-      const r = await sendVerificationCode(email);
-      setCodeSent(true);
-      if (r.data.devCode) {
-        toast(t('auth.devCodeToast', { code: r.data.devCode }), { duration: 15000 });
-      } else {
-        toast.success(t('auth.codeSentToast'));
-      }
     } catch (e: any) {
       toast.error(e.response?.data?.message || t('auth.registrationFailed'));
     }
@@ -72,25 +51,7 @@ export function Register() {
 
       <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
         <Input {...register('username')} label={t('auth.username')} placeholder={t('auth.enterUsername')} error={errors.username?.message} />
-        <div>
-          <Input {...register('email')} type="email" label={t('auth.email')} placeholder={t('auth.enterEmail')} error={errors.email?.message} />
-          <button
-            type="button"
-            onClick={onSendCode}
-            disabled={isSendingCode || codeSent}
-            className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary-400 transition-colors hover:text-primary-300 disabled:cursor-not-allowed disabled:text-dark-500"
-          >
-            {isSendingCode ? '...' : codeSent ? t('auth.resendCode') : t('auth.sendCode')}
-          </button>
-        </div>
-        <Input
-          {...register('code')}
-          inputMode="numeric"
-          maxLength={6}
-          label={t('auth.enterCode')}
-          placeholder={t('auth.codePlaceholder')}
-          error={errors.code?.message}
-        />
+        <Input {...register('email')} type="email" label={t('auth.email')} placeholder={t('auth.enterEmail')} error={errors.email?.message} />
         <div className="relative">
           <Input
             {...register('password')}

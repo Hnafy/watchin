@@ -1,14 +1,9 @@
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { User, RefreshToken, Notification, EmailVerification, BlockedEmail } from '../db/models.js';
+import { User, RefreshToken, Notification, BlockedEmail } from '../db/models.js';
 import { generateTokens, verifyRefreshToken } from '../utils/jwt.js';
 import { AppError } from '../utils/AppError.js';
 import { config } from '../config/index.js';
-import { sendVerificationEmail } from './emailService.js';
-
-const CODE_TTL_MS = 10 * 60 * 1000;
-const MAX_CODE_ATTEMPTS = 5;
 
 const googleClient = config.google.clientId
   ? new OAuth2Client(config.google.clientId)
@@ -34,54 +29,7 @@ const getIssuedTokens = async (userId: string, email: string, role: string) => {
 };
 
 export const authService = {
-  async sendVerificationCode(data: { email: string }) {
-    const email = data.email.toLowerCase().trim();
-
-    await isBlockedEmail(email);
-
-    const existing = await User.findOne({ email });
-    if (existing) {
-      throw AppError.badRequest('An account with this email already exists');
-    }
-
-    const code = crypto.randomInt(100000, 1000000).toString();
-    const expiresAt = new Date(Date.now() + CODE_TTL_MS);
-
-    await EmailVerification.findOneAndUpdate(
-      { email, purpose: 'REGISTER' },
-      { code, attempts: 0, expiresAt, createdAt: new Date() },
-      { upsert: true }
-    );
-
-    const { devCode } = await sendVerificationEmail(email, code);
-    return { devCode };
-  },
-
-  async verifyCode(email: string, code: string) {
-    const record = await EmailVerification.findOne({
-      email: email.toLowerCase().trim(),
-      purpose: 'REGISTER',
-    });
-
-    if (!record || record.expiresAt < new Date()) {
-      throw AppError.badRequest('Verification code expired, request a new one');
-    }
-
-    if (record.attempts >= MAX_CODE_ATTEMPTS) {
-      await EmailVerification.deleteOne({ _id: record._id });
-      throw AppError.badRequest('Too many attempts, request a new code');
-    }
-
-    if (record.code !== code) {
-      record.attempts += 1;
-      await record.save();
-      throw AppError.badRequest('Incorrect verification code');
-    }
-
-    return true;
-  },
-
-  async register(data: { email: string; username: string; password: string; code: string }) {
+  async register(data: { email: string; username: string; password: string }) {
     const existingUser = await User.findOne({
       $or: [{ email: data.email }, { username: data.username }],
     });
@@ -91,13 +39,6 @@ export const authService = {
     }
 
     await isBlockedEmail(data.email);
-
-    if (!data.code) {
-      throw AppError.badRequest('Verification code required');
-    }
-
-    await this.verifyCode(data.email, data.code);
-    await EmailVerification.deleteOne({ email: data.email.toLowerCase().trim(), purpose: 'REGISTER' });
 
     const passwordHash = await bcrypt.hash(data.password, config.bcrypt.saltRounds);
 

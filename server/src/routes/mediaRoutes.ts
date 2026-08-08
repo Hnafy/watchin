@@ -32,8 +32,11 @@ router.get('/slug/:slug', publicCache, optionalAuth, mediaController.getMediaByS
 router.get('/:id', publicCache, optionalAuth, mediaController.getMediaById);
 router.post('/:id/view', mediaController.incrementViewCount);
 
+// Real video sources are served to guests too (they can watch without an
+// account); only admin create/update/delete below require authentication.
+router.get('/source/:id', optionalAuth, mediaController.getWatchSource);
+
 router.use(authenticate);
-router.get('/source/:id', mediaController.getWatchSource);
 router.post('/', authorize('ADMIN', 'MODERATOR'), mediaController.createMedia);
 router.patch('/:id', authorize('ADMIN', 'MODERATOR'), mediaController.updateMedia);
 router.delete('/:id', authorize('ADMIN'), mediaController.deleteMedia);

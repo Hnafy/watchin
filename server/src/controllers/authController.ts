@@ -18,19 +18,6 @@ export const authController = {
     }
   },
 
-  async sendVerificationCode(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { devCode } = await authService.sendVerificationCode(req.body);
-      res.json({
-        status: 'success',
-        message: 'Verification code sent',
-        devCode,
-      });
-    } catch (error) {
-      next(error);
-    }
-  },
-
   async googleLogin(req: Request, res: Response, next: NextFunction) {
     try {
       const { user, accessToken, refreshToken } = await authService.googleLogin(req.body.idToken);

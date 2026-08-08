@@ -475,24 +475,6 @@ NotificationSchema.index({ userId: 1, read: 1, createdAt: -1 });
 export const Notification = model('Notification', NotificationSchema);
 
 // ---------------------------------------------------------------------------
-// EmailVerification
-// ---------------------------------------------------------------------------
-const EmailVerificationSchema = new Schema(
-  {
-    email: { type: String, required: true, lowercase: true, index: true },
-    code: { type: String, required: true },
-    purpose: { type: String, enum: ['REGISTER'], default: 'REGISTER' },
-    attempts: { type: Number, default: 0 },
-    expiresAt: { type: Date, required: true },
-    createdAt: { type: Date, default: Date.now },
-  },
-  { collection: 'emailverifications' }
-);
-
-EmailVerificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-export const EmailVerification = model('EmailVerification', EmailVerificationSchema);
-
-// ---------------------------------------------------------------------------
 // SearchLog
 // ---------------------------------------------------------------------------
 const SearchLogSchema = new Schema(
