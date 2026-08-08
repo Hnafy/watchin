@@ -47,12 +47,6 @@ export const adminService = {
 
   async getMediaById(id: string) {
     return Media.findById(id).populate('genres countries languages keywords').populate({
-      path: 'cast',
-      populate: { path: 'person', select: 'name' },
-    }).populate({
-      path: 'directors',
-      populate: { path: 'person', select: 'name' },
-    }).populate({
       path: 'seasons',
       options: { sort: { seasonNumber: 1 } },
       populate: { path: 'episodes', options: { sort: { episodeNumber: 1 } } },
